@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pkl
+venv/
+.env
+
+# Ruby
+/log/*
+/tmp/*
+/vendor/bundle/
+/node_modules/
+/fetal-risk-backend/db/*.sqlite3
+/fetal-risk-backend/db/*.sqlite3-journal
+
+# Node
+node_modules/
+dist/
+build/
+
+# macOS
+.DS_Store
+

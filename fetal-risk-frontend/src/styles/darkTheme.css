@@ -1,0 +1,133 @@
+:root {
+  --bg-main: #0e0e10;
+  --bg-surface: #1a1c1f;
+  --bg-surface-soft: #202226;
+  --border-subtle: #2b2e31;
+  --text-primary: #e6e6e8;
+  --text-secondary: #9a9ca0;
+  --accent-navy: #1e3a8a;
+  --accent-navy-soft: #344fa1;
+  --accent-camel: #c49a6c;
+  --accent-amber: #f9a825;
+  --accent-red: #e84545;
+  --accent-green: #4caf50;
+}
+
+/* GLOBAL */
+
+body {
+  background-color: var(--bg-main) !important;
+  color: var(--text-primary) !important;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+}
+
+/* Layout */
+
+.app-shell {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+}
+
+.app-main {
+  background-color: var(--bg-main);
+}
+
+/* NAVBAR & SIDEBAR */
+
+.navbar-dark {
+  background-color: #111217 !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.app-sidebar {
+  background-color: var(--bg-surface) !important;
+  border-right: 1px solid var(--border-subtle) !important;
+}
+
+.app-sidebar .nav-link {
+  color: var(--text-secondary) !important;
+  font-weight: 500;
+  border-radius: 999px;
+  padding-left: 0.75rem;
+}
+
+.app-sidebar .nav-link:hover,
+.app-sidebar .nav-link.active {
+  color: var(--accent-camel) !important;
+  background-color: rgba(196, 154, 108, 0.06);
+}
+
+/* CARDS / SURFACES */
+
+.card {
+  background-color: var(--bg-surface) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+  border-radius: 14px;
+}
+
+.card-title {
+  color: var(--text-primary);
+}
+
+/* BUTTONS */
+
+.btn-primary {
+  background-color: var(--accent-navy) !important;
+  border-color: var(--accent-navy-soft) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--accent-navy-soft) !important;
+  border-color: var(--accent-navy-soft) !important;
+}
+
+/* BADGES */
+
+.badge.bg-success,
+.badge-success {
+  background-color: var(--accent-green) !important;
+}
+
+.badge.bg-warning,
+.badge-warning {
+  background-color: var(--accent-amber) !important;
+  color: #000 !important;
+}
+
+.badge.bg-danger,
+.badge-danger {
+  background-color: var(--accent-red) !important;
+}
+
+/* LISTGROUP / ALERTS */
+
+.list-group-item {
+  background-color: var(--bg-surface-soft) !important;
+  border-color: var(--border-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+/* METRIC TILES */
+
+.metric-tile {
+  background: radial-gradient(circle at top left, rgba(196, 154, 108, 0.18), transparent 55%),
+              var(--bg-surface);
+  border-radius: 16px;
+}
+
+/* CHART WRAPPER */
+
+.chart-container {
+  background-color: var(--bg-surface);
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  padding: 16px;
+}
+
+/* SMALL UTILS */
+
+.text-soft {
+  color: var(--text-secondary) !important;
+}
