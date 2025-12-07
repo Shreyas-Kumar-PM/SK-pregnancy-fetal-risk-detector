@@ -1,5 +1,5 @@
-require 'open3'
-require 'json'
+require "open3"
+require "json"
 
 class MlRiskEvaluator
   def initialize(patient, reading)
@@ -19,11 +19,12 @@ class MlRiskEvaluator
       temperature: @reading.temperature
     }.to_json
 
-    python_path = Rails.root.join("ml", "predict.py")
+    # predict.py is in ../ml relative to Rails root
+    python_path = Rails.root.join("..", "ml", "predict.py")
 
     stdout, stderr, status = Open3.capture3("python3 #{python_path} '#{input}'")
 
-    if !status.success?
+    unless status.success?
       Rails.logger.error("ML ERROR: #{stderr}")
       return fallback
     end
@@ -32,7 +33,7 @@ class MlRiskEvaluator
 
     {
       "risk_level" => result["risk_level"],
-      "risk_score" => result["risk_score"],   # MUST be a real number
+      "risk_score" => result["risk_score"],
       "reason"     => result["reason"]
     }
   rescue => e
@@ -46,7 +47,7 @@ class MlRiskEvaluator
     {
       "risk_level" => "normal",
       "risk_score" => 0.1,
-      "reason" => "Fallback ML model"
+      "reason"     => "Fallback ML model (normal)"
     }
   end
 end

@@ -1,0 +1,26 @@
+<h2>Fetal Risk Alert</h2>
+
+<p>Hello <%= @user.name %>,</p>
+
+<p>
+  Your profile <strong><%= @patient.name %></strong> has triggered a
+  <strong><%= @evaluation['risk_level'].upcase %></strong> risk alert.
+</p>
+
+<h3>Reason</h3>
+<p><%= @evaluation['reason'] %></p>
+
+<h3>Latest vitals</h3>
+<ul>
+  <li>Maternal HR: <%= @reading.maternal_hr %> bpm</li>
+  <li>Blood Pressure: <%= @reading.systolic_bp %>/<%= @reading.diastolic_bp %> mmHg</li>
+  <li>Fetal HR: <%= @reading.fetal_hr %> bpm</li>
+  <li>Fetal movement count: <%= @reading.fetal_movement_count %></li>
+  <li>SpO₂: <%= @reading.spo2 %>%</li>
+  <li>Temperature: <%= @reading.temperature %> °C</li>
+  <li>Recorded at: <%= @reading.recorded_at.in_time_zone('Asia/Kolkata') %></li>
+</ul>
+
+<p>Please review the dashboard and take clinical action if needed.</p>
+
+<p>— Pregnancy Fetal Risk Monitor</p>
