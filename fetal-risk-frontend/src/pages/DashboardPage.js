@@ -3,24 +3,30 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Row, Col, Button } from 'react-bootstrap';
 import { getReadings } from '../api/readingsApi';
-import { getCurrentRisk } from '../api/riskApi';
+import { getCurrentRisk, downloadRiskReport } from '../api/riskApi';
 import { simulateReading } from '../api/simulationApi';
 import AlertsPanel from '../components/dashboard/AlertsPanel';
 import LiveVitalsCard from '../components/dashboard/LiveVitalsCard';
 import PatientInfoCard from '../components/dashboard/PatientInfoCard';
 import RiskStatusCard from '../components/dashboard/RiskStatusCard';
 import VitalsChart from '../components/dashboard/VitalsChart';
-
+import RiskAlertBanner from '../components/RiskAlertBanner';
 
 const DashboardPage = () => {
   const { patientId } = useParams();
   const navigate = useNavigate();
 
+  // Resolve patientId (route param or localStorage)
+  const resolvedPatientId =
+    patientId && patientId !== 'undefined'
+      ? patientId
+      : localStorage.getItem('patientId');
+
   const [readings, setReadings] = useState([]);
   const [risk, setRisk] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
-
+  
   const fetchData = async (id) => {
     try {
       setError(null);
@@ -45,7 +51,7 @@ const DashboardPage = () => {
     }
   };
 
-    const triggerSimulation = async (id, mode) => {
+  const triggerSimulation = async (id, mode) => {
     try {
       const res = await simulateReading(id, mode);
       const { reading, risk_evaluation } = res.data;
@@ -74,40 +80,54 @@ const DashboardPage = () => {
         setError('Failed to generate sample reading.');
       }
     }
-  };  
+  };
 
-    useEffect(() => {
-    const run = async () => {
-      if (!patientId || patientId === 'undefined') {
-        const stored = localStorage.getItem('patientId');
-        if (stored) {
-          navigate(`/patients/${stored}/dashboard`, { replace: true });
-        } else {
-          navigate('/login', { replace: true });
-        }
-        return;
-      }
+  useEffect(() => {
+    if (!resolvedPatientId) {
+      navigate('/login', { replace: true });
+      return;
+    }
 
-      await fetchData(patientId);
-      const interval = setInterval(() => {
-        triggerSimulation(patientId); // normal mode
-      }, 15000);
+    fetchData(resolvedPatientId);
 
-      return () => clearInterval(interval);
-    };
+    const interval = setInterval(() => {
+      // normal mode auto-simulation every 15s
+      triggerSimulation(resolvedPatientId);
+    }, 15000);
 
-    run();
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId, navigate]);
+  }, [resolvedPatientId, navigate]);
 
-    const handleNormalSimulation = () => {
-    if (!patientId || patientId === 'undefined') return;
-    triggerSimulation(patientId);
+  const handleNormalSimulation = () => {
+    if (!resolvedPatientId) return;
+    triggerSimulation(resolvedPatientId);
   };
 
   const handleCriticalSimulation = () => {
-    if (!patientId || patientId === 'undefined') return;
-    triggerSimulation(patientId, 'critical');
+    if (!resolvedPatientId) return;
+    triggerSimulation(resolvedPatientId, 'critical');
+  };
+
+  const handleDownloadReport = async () => {
+    if (!resolvedPatientId) return;
+    try {
+      const res = await downloadRiskReport(resolvedPatientId);
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute(
+        'download',
+        `risk-report-patient-${resolvedPatientId}.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (err) {
+      console.error('Failed to download report:', err);
+      alert('Failed to download report. Please try again.');
+    }
   };
 
   return (
@@ -118,9 +138,12 @@ const DashboardPage = () => {
         </div>
       )}
 
+      {/* 🔴 Real-time alert banner (warning / critical) */}
+      <RiskAlertBanner patientId={resolvedPatientId} />
+
       <Row className="mb-3">
         <Col md={3}>
-          <PatientInfoCard patientId={patientId} />
+          <PatientInfoCard patientId={resolvedPatientId} />
         </Col>
         <Col md={6}>
           <LiveVitalsCard readings={readings} />
@@ -130,14 +153,23 @@ const DashboardPage = () => {
         </Col>
       </Row>
 
-            <Row className="mb-3">
-        <Col className="d-flex justify-content-end gap-2">
-          <Button variant="outline-light" onClick={handleNormalSimulation}>
-            Generate Normal Sample Reading
+      <Row className="mb-3">
+        <Col className="d-flex justify-content-between align-items-center gap-2">
+          <Button
+            variant="outline-info"
+            size="sm"
+            onClick={handleDownloadReport}
+          >
+            ⬇ Download Risk Report (PDF)
           </Button>
-          <Button variant="danger" onClick={handleCriticalSimulation}>
-            Generate Critical Demo Alert
-          </Button>
+          <div className="d-flex justify-content-end gap-2">
+            <Button variant="outline-light" onClick={handleNormalSimulation}>
+              Generate Normal Sample Reading
+            </Button>
+            <Button variant="danger" onClick={handleCriticalSimulation}>
+              Generate Critical Demo Alert
+            </Button>
+          </div>
         </Col>
       </Row>
 

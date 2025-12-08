@@ -1,95 +1,100 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, Table, Button } from 'react-bootstrap';
-import { getPatients } from '../api/patientsApi';
+import React, { useEffect, useState } from "react";
+import { Card, Table, Button } from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
+import { getPatients } from "../api/patientsApi";
 
 const PatientsListPage = () => {
-  const navigate = useNavigate();
   const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const fetchData = async () => {
-    try {
-      setError(null);
-      const res = await getPatients();
-      setPatients(res.data || []);
-    } catch (err) {
-      console.error('Error loading patients:', err);
-      const status = err.response?.status;
-      if (status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('patientId');
-        navigate('/login', { replace: true });
-      } else {
-        setError('Failed to load patients.');
-      }
-    }
-  };
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    let cancelled = false;
 
-  const handleOpenDashboard = (id) => {
-    localStorage.setItem('patientId', id);
-    navigate(`/patients/${id}/dashboard`);
+    const fetchData = async () => {
+      try {
+        setError(null);
+        const res = await getPatients();
+        if (!cancelled) {
+          setPatients(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to load patients:", err);
+        if (!cancelled) {
+          setError("Failed to load patients list.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []); // no warning now – fetchData is defined inside the effect
+
+  const handleOpenPatient = (patient) => {
+    // remember selected patient for sidebar routes
+    localStorage.setItem("patientId", patient.id);
+    navigate(`/patients/${patient.id}/dashboard`);
   };
 
   return (
-    <Card className="shadow-sm">
-      <Card.Body>
-        <Card.Title>My Patients</Card.Title>
-        <div className="small text-soft mb-2">
-          Each account currently manages one patient profile.
-        </div>
+    <div className="p-3">
+      <h2 className="text-white mb-4">Patients</h2>
 
-        {error && (
-          <div className="alert alert-danger py-2 mb-3">
-            {error}
-          </div>
-        )}
+      <Card className="bg-dark text-white shadow-sm">
+        <Card.Body>
+          {error && (
+            <div className="alert alert-danger py-2 mb-3">
+              {error}
+            </div>
+          )}
 
-        <Table striped hover size="sm" variant="dark">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Age</th>
-              <th>Gestation</th>
-              <th>Gravida</th>
-              <th>Contact</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {patients.length === 0 && (
-              <tr>
-                <td colSpan={6} className="text-soft">
-                  No patients found for this account.
-                </td>
-              </tr>
-            )}
-            {patients.map((p) => (
-              <tr key={p.id}>
-                <td>{p.name}</td>
-                <td>{p.age}</td>
-                <td>{p.gestation_weeks} weeks</td>
-                <td>{p.gravida}</td>
-                <td>{p.contact_number}</td>
-                <td className="text-end">
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => handleOpenDashboard(p.id)}
-                  >
-                    Open Dashboard
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      </Card.Body>
-    </Card>
+          {loading ? (
+            <div className="text-soft">Loading patients...</div>
+          ) : patients.length === 0 ? (
+            <div className="text-soft">No patients found yet.</div>
+          ) : (
+            <Table hover responsive borderless className="mb-0 text-white">
+              <thead className="border-bottom border-secondary">
+                <tr>
+                  <th>Name</th>
+                  <th>Age</th>
+                  <th>Gestation</th>
+                  <th>Gravida</th>
+                  <th className="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {patients.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.name}</td>
+                    <td>{p.age}</td>
+                    <td>{p.gestation_weeks} wks</td>
+                    <td>{p.gravida}</td>
+                    <td className="text-end">
+                      <Button
+                        size="sm"
+                        variant="outline-info"
+                        onClick={() => handleOpenPatient(p)}
+                      >
+                        Open
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card.Body>
+      </Card>
+    </div>
   );
 };
 

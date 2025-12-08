@@ -21,12 +21,12 @@ class Api::V1::ReadingsController < ApplicationController
 
   private
 
-  def set_patient
-    @patient = current_user.patient
-    unless @patient && @patient.id.to_s == params[:patient_id].to_s
-      render json: { error: 'Patient not found' }, status: :not_found
-    end
+def set_patient
+  @patient = Patient.find_by(id: params[:patient_id])
+  unless @patient
+    render json: { error: 'Patient not found' }, status: :not_found
   end
+end
 
   def reading_params
     params.require(:reading).permit(

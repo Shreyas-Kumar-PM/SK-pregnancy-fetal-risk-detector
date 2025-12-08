@@ -1,7 +1,19 @@
-import client from './axiosClient';
+// src/api/riskApi.js
+import api from "./axiosClient";
 
-export const getCurrentRisk = (patientId) =>
-  client.get(`/patients/${patientId}/current_risk`);
+// current risk (used by dashboard + alert banner)
+export const getCurrentRisk = (patientId) => {
+  return api.get(`/patients/${patientId}/current_risk`);
+};
 
-export const getRiskHistory = (patientId) =>
-  client.get(`/patients/${patientId}/risk_history`);
+// risk history (used by analytics page)
+export const getRiskHistory = (patientId) => {
+  return api.get(`/patients/${patientId}/risk_history`);
+};
+
+// PDF report download (used by DashboardPage handleDownloadReport)
+export const downloadRiskReport = (patientId) => {
+  return api.get(`/patients/${patientId}/report`, {
+    responseType: "blob",
+  });
+};

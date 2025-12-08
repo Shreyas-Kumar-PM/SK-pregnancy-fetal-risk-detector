@@ -8,6 +8,7 @@ import PatientsListPage from './pages/PatientsListPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import AnalyticsDashboard from './pages/AnalyticsDashboard'; // analytics page
 
 const App = () => {
   const [auth, setAuth] = useState(() => ({
@@ -31,33 +32,57 @@ const App = () => {
             isAuthenticated ? (
               <MainLayout auth={auth} setAuth={setAuth}>
                 <Routes>
+                  {/* default -> redirect to current patient's dashboard */}
                   <Route
                     path="/"
-                    element={<Navigate to={`/patients/${auth.patientId}/dashboard`} />}
+                    element={
+                      <Navigate
+                        to={`/patients/${auth.patientId}/dashboard`}
+                        replace
+                      />
+                    }
                   />
 
                   <Route
                     path="/patients/:patientId/dashboard"
                     element={<DashboardPage />}
                   />
+
                   <Route
                     path="/patients/:patientId/history"
                     element={<PatientHistoryPage />}
                   />
+
+                  {/* ✅ NEW: analytics route with patientId */}
+                  <Route
+                    path="/patients/:patientId/analytics"
+                    element={<AnalyticsDashboard />}
+                  />
+
                   <Route
                     path="/patients"
                     element={<PatientsListPage />}
                   />
+
                   <Route
                     path="/settings"
                     element={<SettingsPage />}
                   />
 
-                  <Route path="*" element={<Navigate to="/" />} />
+                  {/* catch-all inside layout -> go to dashboard */}
+                  <Route
+                    path="*"
+                    element={
+                      <Navigate
+                        to={`/patients/${auth.patientId}/dashboard`}
+                        replace
+                      />
+                    }
+                  />
                 </Routes>
               </MainLayout>
             ) : (
-              <Navigate to="/login" />
+              <Navigate to="/login" replace />
             )
           }
         />

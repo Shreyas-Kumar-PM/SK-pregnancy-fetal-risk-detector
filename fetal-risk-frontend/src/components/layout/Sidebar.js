@@ -5,6 +5,7 @@ import { Link, useParams, useLocation } from 'react-router-dom';
 const Sidebar = () => {
   const { patientId } = useParams();
   const location = useLocation();
+  const pid = patientId || localStorage.getItem("patientId");
 
   const isActive = (path) => location.pathname === path;
 
@@ -17,21 +18,33 @@ const Sidebar = () => {
         <Nav.Item>
           <Nav.Link
             as={Link}
-            to={`/patients/${patientId}/dashboard`}
-            className={isActive(`/patients/${patientId}/dashboard`) ? 'active' : ''}
+            to={`/patients/${pid}/dashboard`}
+            className={isActive(`/patients/${pid}/dashboard`) ? 'active' : ''}
           >
             Dashboard
           </Nav.Link>
         </Nav.Item>
+
         <Nav.Item>
           <Nav.Link
             as={Link}
-            to={`/patients/${patientId}/history`}
-            className={isActive(`/patients/${patientId}/history`) ? 'active' : ''}
+            to={`/patients/${pid}/history`}
+            className={isActive(`/patients/${pid}/history`) ? 'active' : ''}
           >
             History
           </Nav.Link>
         </Nav.Item>
+
+        <Nav.Item>
+          <Nav.Link
+            as={Link}
+            to={`/patients/${pid}/analytics`}
+            className={isActive(`/patients/${pid}/analytics`) ? 'active' : ''}
+          >
+            Analytics
+          </Nav.Link>
+        </Nav.Item>
+
         <Nav.Item>
           <Nav.Link
             as={Link}
@@ -41,6 +54,7 @@ const Sidebar = () => {
             Patients
           </Nav.Link>
         </Nav.Item>
+
         <Nav.Item>
           <Nav.Link
             as={Link}

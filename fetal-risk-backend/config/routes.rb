@@ -11,6 +11,7 @@ Rails.application.routes.draw do
         resources :readings, only: [:index, :create]
         get 'current_risk', to: 'risk#current'
         get 'risk_history', to: 'risk#history'
+        get :report,        to: "reports#show"
       end
 
       post 'patients/:patient_id/simulate_reading', to: 'simulation#create'
