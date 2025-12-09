@@ -1,0 +1,99 @@
+.ai-modal .modal-content {
+  background: #fefefe;
+  border-radius: 18px;
+  padding: 10px;
+  border: none;
+  box-shadow: 0px 4px 25px rgba(0, 0, 0, 0.15);
+  animation: slideDown 0.35s ease-out;
+}
+
+.ai-header {
+  border-bottom: none;
+  text-align: center;
+}
+
+.ai-title {
+  width: 100%;
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: #4a4a4a;
+}
+
+.ai-body {
+  padding: 20px 35px;
+  color: #444;
+  font-size: 1.05rem;
+}
+
+.ai-intro {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.ai-intro h5 {
+  color: #333;
+  font-weight: 600;
+}
+
+.ai-hint {
+  color: #888;
+  margin-top: 8px;
+  font-style: italic;
+}
+
+.ai-loading .loading-text {
+  font-size: 1.1rem;
+  margin-top: 12px;
+  color: #5a5a5a;
+}
+
+.ai-response {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 20px;
+  line-height: 1.6;
+  border: 1px solid #e5e7eb;
+  font-size: 1.05rem;
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.ai-footer {
+  border-top: none;
+  padding: 0 20px 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.ai-btn-generate {
+  background: #0d6efd;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: background 0.2s;
+}
+
+.ai-btn-generate:hover {
+  background: #0959d1;
+}
+
+.ai-btn-close {
+  background: #6c757d;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 12px;
+  font-size: 1rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-15px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

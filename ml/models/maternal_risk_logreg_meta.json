@@ -1,0 +1,15 @@
+{
+  "features": [
+    "Age",
+    "SystolicBP",
+    "DiastolicBP",
+    "BS",
+    "BodyTemp",
+    "HeartRate"
+  ],
+  "label_mapping": {
+    "low risk": 0,
+    "mid risk": 1,
+    "high risk": 2
+  }
+}

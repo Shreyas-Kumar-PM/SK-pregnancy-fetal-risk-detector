@@ -131,3 +131,190 @@ body {
 .text-soft {
   color: var(--text-secondary) !important;
 }
+
+/* Dashboard background with mother + baby image */
+.dashboard-bg {
+  min-height: 100vh;
+  position: relative;
+
+  /* adjust the path depending on where this CSS file lives */
+  background-image: url('../assets/images/mother-baby-bg.jpg');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* dark overlay so cards are readable */
+.dashboard-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(0,0,0,0.4), rgba(0,0,0,0.85));
+  backdrop-filter: blur(1px);
+}
+
+/* content wrapper so your existing layout sits above the image */
+.dashboard-bg-inner {
+  position: relative;
+  z-index: 1;
+  padding: 1.5rem;
+}
+.dashboard-bg {
+  min-height: 100vh;
+  background-image: url('../assets/images/mother-baby-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  position: relative;
+}
+
+.dashboard-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(0,0,0,0.4), rgba(0,0,0,0.85));
+  backdrop-filter: blur(2px);
+}
+
+.dashboard-bg-inner {
+  position: relative;
+  z-index: 1;
+  padding: 1.5rem;
+}
+
+/* BEAUTIFUL, HIGH-VISIBILITY WELCOME BANNER */
+.welcome-banner {
+  background: rgba(255, 255, 255, 0.18);
+  padding: 22px 28px;
+  border-radius: 18px;
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+
+  /* subtle inner + outer glow */
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.25),
+    inset 0 0 12px rgba(255, 255, 255, 0.25);
+
+  /* premium gradient overlay */
+  background-image:
+    linear-gradient(
+      to bottom right,
+      rgba(255, 255, 255, 0.25),
+      rgba(255, 255, 255, 0.05)
+    );
+
+  animation: slideUpFade 0.9s ease forwards;
+  max-width: 840px;
+  margin-bottom: 25px;
+}
+.welcome-banner {
+  border-image: linear-gradient(120deg, #ffd6e8, #c3e8ff) 1;
+}
+.welcome-banner {
+  position: relative;
+  overflow: hidden;
+}
+.welcome-banner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -150px;
+  width: 120px;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(255, 255, 255, 0.45),
+    transparent
+  );
+  transform: skewX(-20deg);
+  animation: shimmer 2.8s infinite ease-in-out;
+}
+
+@keyframes shimmer {
+  0% { left: -150px; }
+  100% { left: 110%; }
+}
+
+/* Title — Glowing soft white */
+.welcome-title {
+  margin: 0 0 8px 0;
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(255, 255, 255, 0.4);
+}
+
+/* Paragraph — brighter white, more readable */
+.welcome-text {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55rem;
+  color: #f8f8f8;
+  opacity: 0.95;
+
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.5),
+    0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+
+/* ========== ANIMATION KEYFRAMES ========== */
+
+/* Fade in softly */
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Slide up + fade */
+@keyframes slideUpFade {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Gentle zoom + fade for cards */
+@keyframes cardAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
+/* ========== APPLY ANIMATIONS TO ELEMENTS ========== */
+
+/* Dashboard root fade */
+.dashboard-bg-inner {
+  animation: fadeIn 0.9s ease;
+}
+
+/* Welcome banner animation */
+.welcome-banner {
+  animation: slideUpFade 0.8s ease forwards;
+}
+
+/* Cards — risk, vitals, patient info, charts, alerts */
+.card,
+.list-group-item,
+.alert {
+  animation: cardAppear 0.6s ease;
+}
+
+/* Delay cards slightly for layered effect */
+.card:nth-child(1) { animation-delay: 0.15s; }
+.card:nth-child(2) { animation-delay: 0.25s; }
+.card:nth-child(3) { animation-delay: 0.35s; }
