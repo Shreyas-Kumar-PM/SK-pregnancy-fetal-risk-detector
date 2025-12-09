@@ -407,7 +407,7 @@ body {
     transform: scale(1);
   }
 }
-Modal.title{
+.ai-care-coach-title {
   color: #ffffff !important;   /* 💡 pure bright white */
   font-weight: 700;
   font-size: 1.65rem;
