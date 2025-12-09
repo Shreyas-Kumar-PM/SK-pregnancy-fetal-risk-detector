@@ -40,8 +40,11 @@ const AnalyticsDashboard = () => {
   // If missing, fallback to localStorage
   const patientId = routePatientId || localStorage.getItem("patientId");
 
-  const [readings, setReadings] = useState([]);
-  const [evaluations, setEvaluations] = useState([]);
+  // We only ever *set* these and don't read the raw arrays,
+  // so we drop the first element to avoid ESLint "unused" warnings.
+  const [, setReadings] = useState([]);
+  const [, setEvaluations] = useState([]);
+
   const [pieData, setPieData] = useState([]);
   const [riskTimeline, setRiskTimeline] = useState([]);
   const [readingsWithLabel, setReadingsWithLabel] = useState([]);
@@ -75,6 +78,7 @@ const AnalyticsDashboard = () => {
 
         const eData = eRes.data || [];
 
+        // keep setters (for future potential use) but we don't read them
         setReadings(rData);
         setEvaluations(eData);
 
@@ -102,13 +106,24 @@ const AnalyticsDashboard = () => {
 
         // Pie chart distribution
         const pie = [
-          { name: "Normal", value: formattedEval.filter((e) => e.risk_level === "normal").length, key: "normal" },
-          { name: "Warning", value: formattedEval.filter((e) => e.risk_level === "warning").length, key: "warning" },
-          { name: "Critical", value: formattedEval.filter((e) => e.risk_level === "critical").length, key: "critical" },
+          {
+            name: "Normal",
+            value: formattedEval.filter((e) => e.risk_level === "normal").length,
+            key: "normal",
+          },
+          {
+            name: "Warning",
+            value: formattedEval.filter((e) => e.risk_level === "warning").length,
+            key: "warning",
+          },
+          {
+            name: "Critical",
+            value: formattedEval.filter((e) => e.risk_level === "critical").length,
+            key: "critical",
+          },
         ].filter((p) => p.value > 0);
 
         setPieData(pie);
-
       } catch (err) {
         console.error("Failed to load analytics:", err);
         setError("Failed to load analytics data.");
@@ -160,10 +175,7 @@ const AnalyticsDashboard = () => {
                           label
                         >
                           {pieData.map((entry, idx) => (
-                            <Cell
-                              key={idx}
-                              fill={RISK_COLORS[entry.key]}
-                            />
+                            <Cell key={idx} fill={RISK_COLORS[entry.key]} />
                           ))}
                         </Pie>
                         <Tooltip />
@@ -191,8 +203,16 @@ const AnalyticsDashboard = () => {
                         <YAxis domain={[0, 1]} />
                         <Tooltip />
                         <Legend />
-                        <ReferenceLine y={0.4} stroke="#FFC107" strokeDasharray="3 3" />
-                        <ReferenceLine y={0.8} stroke="#F44336" strokeDasharray="3 3" />
+                        <ReferenceLine
+                          y={0.4}
+                          stroke="#FFC107"
+                          strokeDasharray="3 3"
+                        />
+                        <ReferenceLine
+                          y={0.8}
+                          stroke="#F44336"
+                          strokeDasharray="3 3"
+                        />
                         <Line
                           type="monotone"
                           dataKey="risk_score"
@@ -229,7 +249,11 @@ const AnalyticsDashboard = () => {
                         <YAxis />
                         <Tooltip />
                         <Legend />
-                        <ReferenceLine y={110} stroke="#FFC107" strokeDasharray="3 3" />
+                        <ReferenceLine
+                          y={110}
+                          stroke="#FFC107"
+                          strokeDasharray="3 3"
+                        />
                         <Line
                           type="monotone"
                           dataKey="maternal_hr"
@@ -256,8 +280,16 @@ const AnalyticsDashboard = () => {
                       <AreaChart data={readingsWithLabel}>
                         <defs>
                           <linearGradient id="fhrColor" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
-                            <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
+                            <stop
+                              offset="5%"
+                              stopColor="#8884d8"
+                              stopOpacity={0.8}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#8884d8"
+                              stopOpacity={0}
+                            />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" />
@@ -265,8 +297,16 @@ const AnalyticsDashboard = () => {
                         <YAxis />
                         <Tooltip />
                         <Legend />
-                        <ReferenceLine y={110} stroke="#FFC107" strokeDasharray="3 3" />
-                        <ReferenceLine y={170} stroke="#F44336" strokeDasharray="3 3" />
+                        <ReferenceLine
+                          y={110}
+                          stroke="#FFC107"
+                          strokeDasharray="3 3"
+                        />
+                        <ReferenceLine
+                          y={170}
+                          stroke="#F44336"
+                          strokeDasharray="3 3"
+                        />
                         <Area
                           type="monotone"
                           dataKey="fetal_hr"
@@ -302,7 +342,10 @@ const AnalyticsDashboard = () => {
                         <YAxis />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey="fetal_movement_count" fill="#9c27b0" />
+                        <Bar
+                          dataKey="fetal_movement_count"
+                          fill="#9c27b0"
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -326,9 +369,23 @@ const AnalyticsDashboard = () => {
                         <YAxis />
                         <Tooltip />
                         <Legend />
-                        <ReferenceLine y={94} stroke="#FFC107" strokeDasharray="3 3" />
-                        <Line dataKey="spo2" name="SpO₂ (%)" stroke="#00e676" strokeWidth={2} />
-                        <Line dataKey="temperature" name="Temp (°C)" stroke="#ff7043" strokeWidth={2} />
+                        <ReferenceLine
+                          y={94}
+                          stroke="#FFC107"
+                          strokeDasharray="3 3"
+                        />
+                        <Line
+                          dataKey="spo2"
+                          name="SpO₂ (%)"
+                          stroke="#00e676"
+                          strokeWidth={2}
+                        />
+                        <Line
+                          dataKey="temperature"
+                          name="Temp (°C)"
+                          stroke="#ff7043"
+                          strokeWidth={2}
+                        />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>

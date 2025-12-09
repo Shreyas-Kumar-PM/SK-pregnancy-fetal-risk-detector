@@ -1,7 +1,9 @@
+// src/pages/PatientsListPage.js
 import React, { useEffect, useState } from "react";
 import { Card, Table, Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { getPatients } from "../api/patientsApi";
+import AiDietPlanCard from "../components/AiDietPlanCard"; // ⭐ AI Diet Planner
 
 const PatientsListPage = () => {
   const [patients, setPatients] = useState([]);
@@ -36,10 +38,10 @@ const PatientsListPage = () => {
     return () => {
       cancelled = true;
     };
-  }, []); // no warning now – fetchData is defined inside the effect
+  }, []);
 
   const handleOpenPatient = (patient) => {
-    // remember selected patient for sidebar routes
+    // remember selected patient for sidebar routes + AI helpers
     localStorage.setItem("patientId", patient.id);
     navigate(`/patients/${patient.id}/dashboard`);
   };
@@ -48,7 +50,8 @@ const PatientsListPage = () => {
     <div className="p-3">
       <h2 className="text-white mb-4">Patients</h2>
 
-      <Card className="bg-dark text-white shadow-sm">
+      {/* 🧍‍♀️ Patients table – full width */}
+      <Card className="bg-dark text-white shadow-sm mb-4">
         <Card.Body>
           {error && (
             <div className="alert alert-danger py-2 mb-3">
@@ -61,7 +64,12 @@ const PatientsListPage = () => {
           ) : patients.length === 0 ? (
             <div className="text-soft">No patients found yet.</div>
           ) : (
-            <Table hover responsive borderless className="mb-0 text-white">
+            <Table
+              hover
+              responsive
+              borderless
+              className="mb-0 text-white"
+            >
               <thead className="border-bottom border-secondary">
                 <tr>
                   <th>Name</th>
@@ -94,6 +102,11 @@ const PatientsListPage = () => {
           )}
         </Card.Body>
       </Card>
+
+      {/* 🥗 AI Daily Diet Planner – also wide, directly under table */}
+      <div className="mt-3">
+        <AiDietPlanCard />
+      </div>
     </div>
   );
 };

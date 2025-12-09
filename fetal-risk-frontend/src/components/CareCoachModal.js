@@ -9,7 +9,6 @@ const CareCoachModal = () => {
   const [tips, setTips] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Listen for "open-care-coach" events from sidebar / buttons
   useEffect(() => {
     const handler = (e) => {
       const idFromEvent = e.detail?.patientId;
@@ -55,19 +54,57 @@ const CareCoachModal = () => {
       centered
       dialogClassName="ai-health-modal"
     >
-      <Modal.Header closeButton>
-        <Modal.Title>🌸 AI Pregnancy Care Coach</Modal.Title>
+      {/* ---------- HEADER ----------- */}
+      <Modal.Header
+        closeButton
+        className="border-0 pb-0"
+        style={{
+          background: "rgba(255,255,255,0.05)",
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        <Modal.Title>
+          <span
+            style={{
+              fontSize: "1.6rem",
+              fontWeight: 800,
+              color: "#ffffff",
+              textShadow: "0 0 10px rgba(255,255,255,0.45)",
+            }}
+          >
+            🌸 AI Pregnancy Care{" "}
+            <span
+              style={{
+                color: "#87b7ff",
+                background: "rgba(135,183,255,0.15)",
+                padding: "2px 6px",
+                borderRadius: "8px",
+                textShadow: "0 0 8px rgba(135,183,255,0.55)",
+              }}
+            >
+              Coach
+            </span>
+          </span>
+        </Modal.Title>
       </Modal.Header>
 
-      <Modal.Body>
+      {/* ---------- BODY ----------- */}
+      <Modal.Body
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          backdropFilter: "blur(12px)",
+          borderRadius: "12px",
+        }}
+      >
         <p className="text-soft small mb-3">
           These are gentle self-care suggestions based on your latest screening.
-          They are educational only and <strong>do not replace your doctor</strong>.
+          They are educational only and{" "}
+          <strong style={{ color: "#fff" }}>do not replace your doctor</strong>.
         </p>
 
         {loading && (
           <div className="text-center my-3">
-            <Spinner animation="border" />
+            <Spinner animation="border" variant="light" />
             <div className="mt-2 small text-soft">
               Preparing personalised care tips…
             </div>
@@ -76,15 +113,42 @@ const CareCoachModal = () => {
 
         {!loading && !tips && (
           <div className="text-center my-2 text-soft small">
-            Click the button below to get your AI-generated care tips.
+            Click the button below to get your personalised AI-generated care
+            suggestions.
           </div>
         )}
 
+        {/* ---------- TIPS BOX ---------- */}
         {tips && !loading && (
-          <div className="ai-answer-box mt-3">
-            <div className="small text-soft mb-1">Care suggestions</div>
+          <div
+            className="ai-answer-box mt-3"
+            style={{
+              background: "rgba(255,255,255,0.07)",
+              borderRadius: "16px",
+              border: "1px solid rgba(255,255,255,0.18)",
+              padding: "18px",
+              color: "#eaeaea",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
+            }}
+          >
             <div
-              style={{ whiteSpace: "pre-line" }}
+              className="small"
+              style={{
+                fontWeight: 600,
+                marginBottom: "8px",
+                color: "#a7c6ff",
+              }}
+            >
+              🌿 Care suggestions
+            </div>
+
+            <div
+              style={{
+                whiteSpace: "pre-line",
+                lineHeight: "1.55",
+                color: "#f0f0f0",
+                fontSize: "0.93rem",
+              }}
               className="ai-answer-text"
             >
               {tips}
@@ -93,14 +157,34 @@ const CareCoachModal = () => {
         )}
       </Modal.Body>
 
-      <Modal.Footer>
+      {/* ---------- FOOTER ----------- */}
+      <Modal.Footer
+        className="border-0"
+        style={{ background: "rgba(255,255,255,0.02)" }}
+      >
         {!loading && !tips && (
-          <Button variant="primary" onClick={handleGetTips}>
+          <Button
+            variant="primary"
+            onClick={handleGetTips}
+            style={{
+              padding: "8px 18px",
+              fontWeight: 600,
+              borderRadius: "10px",
+              boxShadow: "0 0 12px rgba(82,150,255,0.5)",
+            }}
+          >
             Get Care Tips
           </Button>
         )}
+
         {tips && (
-          <Button variant="outline-secondary" onClick={() => setShow(false)}>
+          <Button
+            variant="outline-secondary"
+            onClick={() => setShow(false)}
+            style={{
+              borderRadius: "10px",
+            }}
+          >
             Close
           </Button>
         )}
