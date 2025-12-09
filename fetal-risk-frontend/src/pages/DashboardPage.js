@@ -3,7 +3,11 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Row, Col, Button } from "react-bootstrap";
 import { getReadings } from "../api/readingsApi";
-import { getCurrentRisk, downloadRiskReport } from "../api/riskApi";
+import {
+  getCurrentRisk,
+  downloadRiskReport,
+  getRiskForecast,        // ⬅ NEW
+} from "../api/riskApi";
 import { simulateReading } from "../api/simulationApi";
 import AlertsPanel from "../components/dashboard/AlertsPanel";
 import LiveVitalsCard from "../components/dashboard/LiveVitalsCard";
@@ -12,6 +16,10 @@ import RiskStatusCard from "../components/dashboard/RiskStatusCard";
 import VitalsChart from "../components/dashboard/VitalsChart";
 import RiskAlertBanner from "../components/RiskAlertBanner";
 import ExplainRiskModal from "../components/ExplainRiskModal";
+import AiHealthSearchModal from "../components/AiHealthSearchModal";
+import RiskForecastCard from "../components/dashboard/RiskForecastCard"; // ⬅ NEW
+import CareCoachModal from "../components/CareCoachModal"; // ⬅ NEW
+
 
 const DashboardPage = () => {
   const { patientId } = useParams();
@@ -25,12 +33,13 @@ const DashboardPage = () => {
 
   const [readings, setReadings] = useState([]);
   const [risk, setRisk] = useState(null);
+  const [riskForecast, setRiskForecast] = useState(null); // ⬅ NEW
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
   const [loadingRisk, setLoadingRisk] = useState(true);
 
   // -------------------------------------------------------
-  // FIX: Wrap fetchData in useCallback to avoid stale refs
+  // fetchData wrapped in useCallback
   // -------------------------------------------------------
   const fetchData = useCallback(
     async (id) => {
@@ -38,13 +47,15 @@ const DashboardPage = () => {
         setError(null);
         setLoadingRisk(true);
 
-        const [readingsRes, riskRes] = await Promise.all([
+        const [readingsRes, riskRes, forecastRes] = await Promise.all([
           getReadings(id),
           getCurrentRisk(id),
+          getRiskForecast(id), // ⬅ NEW
         ]);
 
         setReadings(readingsRes.data);
         setRisk(riskRes.data);
+        setRiskForecast(forecastRes.data); // ⬅ NEW
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         const status = err.response?.status;
@@ -65,7 +76,7 @@ const DashboardPage = () => {
   );
 
   // -------------------------------------------------------
-  // FIX: Wrap triggerSimulation in useCallback
+  // triggerSimulation wrapped in useCallback
   // -------------------------------------------------------
   const triggerSimulation = useCallback(
     async (id, mode) => {
@@ -76,12 +87,19 @@ const DashboardPage = () => {
 
         const { reading } = simRes.data;
 
+        // Update readings list (for chart + live vitals)
         setReadings((prev) => [reading, ...prev].slice(0, 100));
 
-        const riskRes = await getCurrentRisk(id);
+        // Refresh risk + forecast together
+        const [riskRes, forecastRes] = await Promise.all([
+          getCurrentRisk(id),
+          getRiskForecast(id), // ⬅ NEW
+        ]);
         const latestRisk = riskRes.data;
         setRisk(latestRisk);
+        setRiskForecast(forecastRes.data); // ⬅ NEW
 
+        // Push alert if needed
         if (
           latestRisk &&
           ["warning", "critical"].includes(latestRisk.risk_level)
@@ -111,7 +129,7 @@ const DashboardPage = () => {
   );
 
   // -------------------------------------------------------
-  // FIXED useEffect dependencies — NO MORE WARNINGS
+  // useEffect with correct deps
   // -------------------------------------------------------
   useEffect(() => {
     if (!resolvedPatientId) {
@@ -122,6 +140,7 @@ const DashboardPage = () => {
     fetchData(resolvedPatientId);
 
     const interval = setInterval(() => {
+      // normal mode auto-simulation every 15s
       triggerSimulation(resolvedPatientId);
     }, 15000);
 
@@ -153,11 +172,35 @@ const DashboardPage = () => {
     }
   };
 
+  // -------------------------------------------------------
+  // RENDER
+  // -------------------------------------------------------
   return (
     <div className="dashboard-bg">
       <div className="dashboard-bg-inner">
         {error && <div className="alert alert-danger py-2 mb-3">{error}</div>}
 
+        {/* Top bar: title + AI health search icon button */}
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h3 className="text-white fw-bold mb-0">
+            Maternal–Fetal Health Dashboard
+          </h3>
+
+          <button
+            className="ai-search-btn"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent("open-ai-health-search", {
+                  detail: { patientId: resolvedPatientId },
+                })
+              )
+            }
+          >
+            🔍 Ask AI Health
+          </button>
+        </div>
+
+        {/* Friendly banner */}
         <div className="welcome-banner mb-4">
           <h4 className="welcome-title">👶 Maternal–Fetal Health Monitoring</h4>
           <p className="welcome-text">
@@ -168,23 +211,36 @@ const DashboardPage = () => {
           </p>
         </div>
 
+        {/* Real-time banner using current risk */}
         <RiskAlertBanner risk={risk} loading={loadingRisk} />
 
-        <Row className="mb-3">
-          <Col md={3}>
-            <PatientInfoCard patientId={resolvedPatientId} />
-          </Col>
-          <Col md={6}>
+        {/* ROW 1: Wide vitals + profile on right */}
+        <Row className="mb-4">
+          <Col md={8}>
             <LiveVitalsCard readings={readings} />
           </Col>
-          <Col md={3}>
-            <RiskStatusCard risk={risk} loading={loadingRisk} />
+          <Col md={4}>
+            <PatientInfoCard patientId={resolvedPatientId} />
           </Col>
         </Row>
 
-        <Row className="mb-3">
+        {/* ROW 2: Current risk as a horizontal bar */}
+        <Row className="mb-4">
+          <Col md={12}>
+            <div className="risk-horizontal-wrapper">
+              <RiskStatusCard risk={risk} loading={loadingRisk} />
+            </div>
+          </Col>
+        </Row>
+
+        {/* ROW 3: Actions */}
+        <Row className="mb-4">
           <Col className="d-flex justify-content-between align-items-center gap-2">
-            <Button variant="outline-info" size="sm" onClick={handleDownloadReport}>
+            <Button
+              variant="outline-info"
+              size="sm"
+              onClick={handleDownloadReport}
+            >
               ⬇ Download Risk Report (PDF)
             </Button>
 
@@ -199,16 +255,24 @@ const DashboardPage = () => {
           </Col>
         </Row>
 
+        {/* ROW 4: Trend chart + AI forecast + Alerts */}
         <Row>
           <Col md={8}>
             <VitalsChart readings={readings} />
+            {/* NEW: AI risk timeline forecast below chart */}
+            <div className="mt-3">
+              <RiskForecastCard forecast={riskForecast} />
+            </div>
           </Col>
           <Col md={4}>
             <AlertsPanel alerts={alerts} />
           </Col>
         </Row>
 
+        {/* Modals */}
         <ExplainRiskModal />
+        <AiHealthSearchModal />
+        <CareCoachModal /> 
       </div>
     </div>
   );

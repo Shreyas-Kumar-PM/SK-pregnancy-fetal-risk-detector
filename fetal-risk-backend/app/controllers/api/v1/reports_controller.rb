@@ -1,178 +1,116 @@
 # app/controllers/api/v1/reports_controller.rb
-class Api::V1::ReportsController < ApplicationController
-  before_action :authorize_request
-  before_action :set_patient
+require "prawn"
 
-  # GET /api/v1/patients/:patient_id/report
-  def show
-    return if performed? # set_patient might have rendered an error
+module Api
+  module V1
+    class ReportsController < ApplicationController
+      before_action :authorize_request
 
-    evaluation = @patient.risk_evaluations
-                         .includes(:reading)
-                         .order(created_at: :desc)
-                         .first
+      # GET /api/v1/patients/:patient_id/report
+      def show
+        # Your app has user.patient (singular)
+        patient = current_user.patient
 
-    unless evaluation
-      render json: { error: "No risk evaluations yet for this patient." },
-             status: :not_found
-      return
-    end
-
-    reading = evaluation.reading
-
-    # ---------- derive age for ML (same as RiskController) ----------
-    age =
-      if @patient.respond_to?(:age) && @patient.age.present?
-        @patient.age
-      elsif @patient.respond_to?(:date_of_birth) && @patient.date_of_birth.present?
-        ((Time.zone.today - @patient.date_of_birth) / 365.25).floor
-      else
-        25
-      end
-
-    # ---------- derive blood sugar (bs) ----------
-    bs =
-      if reading.respond_to?(:bs) && reading.bs.present?
-        reading.bs
-      elsif reading.respond_to?(:blood_sugar) && reading.blood_sugar.present?
-        reading.blood_sugar
-      else
-        90
-      end
-
-    # ---------- fallbacks for other vitals required by ML ----------
-    maternal_hr  = reading.maternal_hr.presence  || 90
-    systolic_bp  = reading.systolic_bp.presence  || 120
-    diastolic_bp = reading.diastolic_bp.presence || 80
-    temperature  = reading.temperature.presence  || 36.8
-
-    vitals = {
-      maternal_hr:          maternal_hr,
-      systolic_bp:          systolic_bp,
-      diastolic_bp:         diastolic_bp,
-      fetal_hr:             reading.fetal_hr,
-      fetal_movement_count: reading.fetal_movement_count,
-      spo2:                 reading.spo2,
-      temperature:          temperature,
-      age:                  age,
-      bs:                   bs
-    }
-
-    ml_prediction = nil
-    begin
-      ml_prediction = Ml::RiskPredictor.call(vitals)
-    rescue Ml::RiskPredictor::PredictionError => e
-      Rails.logger.error("ReportsController ML prediction failed: #{e.message}")
-      # we still generate a PDF using the stored evaluation
-      ml_prediction = nil
-    end
-
-    # ---------- build PDF inline using Prawn ----------
-    # Ensure prawn gem is in your Gemfile (it was in the original project):
-    # gem 'prawn'
-    pdf = Prawn::Document.new
-
-    # Header
-    pdf.text "SK Fetal Risk Detector", size: 18, style: :bold
-    pdf.move_down 5
-    pdf.text "Maternal–Fetal Risk Report", size: 14
-    pdf.move_down 10
-
-    # Patient info
-    pdf.text "Patient Information", style: :bold
-    pdf.text "Name: #{@patient.name}" if @patient.respond_to?(:name)
-    pdf.text "Patient ID: #{@patient.id}"
-    pdf.text "Age: #{age} years"
-    pdf.move_down 10
-
-    # Vitals at time of evaluation
-    pdf.text "Latest Vitals", style: :bold
-    pdf.text "Recorded at: #{reading.recorded_at&.strftime('%d-%m-%Y %I:%M %p')}"
-    pdf.move_down 5
-
-    pdf.table(
-      [
-        ["Maternal HR (bpm)", maternal_hr],
-        ["Systolic BP (mmHg)", systolic_bp],
-        ["Diastolic BP (mmHg)", diastolic_bp],
-        ["SpO₂ (%)", reading.spo2],
-        ["Body Temp (°C)", temperature],
-        ["Fetal HR (bpm)", reading.fetal_hr],
-        ["Fetal movements", reading.fetal_movement_count],
-        ["Blood sugar (BS)", bs]
-      ],
-      header: false,
-      cell_style: { borders: [:bottom], padding: [2, 4, 2, 4] }
-    )
-
-    pdf.move_down 10
-
-    # Heuristic evaluation
-    pdf.text "Heuristic Risk Evaluation", style: :bold
-    pdf.text "Risk level: #{evaluation.risk_level}"
-    pdf.text "Risk score: #{evaluation.risk_score}"
-    pdf.text "Reason: #{evaluation.reason}"
-    pdf.move_down 10
-
-    # ML section (if we got a prediction)
-    if ml_prediction.present?
-      pdf.text "Machine Learning Evaluation", style: :bold
-      pdf.text "Model version: #{ml_prediction['model_version']}" if ml_prediction['model_version']
-      pdf.text "RF ML risk level: #{ml_prediction['ml_risk_level']}" if ml_prediction['ml_risk_level']
-
-      if (rf_probs = ml_prediction['ml_class_probabilities']).present?
-        pdf.move_down 5
-        pdf.text "RF class probabilities:"
-        rf_probs.each do |label, p|
-          pdf.text "  • #{label}: #{(p * 100.0).round(1)}%"
+        # Ensure this patient belongs to the logged in user and IDs match
+        unless patient && patient.id.to_s == params[:patient_id].to_s
+          render json: { error: "Patient not found" }, status: :not_found
+          return
         end
-      end
 
-      if ml_prediction['ml_logreg_risk_level']
-        pdf.move_down 5
-        pdf.text "Logistic Regression risk level: #{ml_prediction['ml_logreg_risk_level']}"
-      end
+        last_reading = patient.readings.order(recorded_at: :desc).first
+        last_risk    = patient.risk_evaluations.order(created_at: :desc).first
 
-      if (lg_probs = ml_prediction['ml_logreg_class_probabilities']).present?
-        pdf.text "LogReg class probabilities:"
-        lg_probs.each do |label, p|
-          pdf.text "  • #{label}: #{(p * 100.0).round(1)}%"
+        # Build PDF in memory
+        pdf = Prawn::Document.new(page_size: "A4", margin: 40)
+
+        # ===== HEADER =====
+        pdf.text safe_str("Maternal-Fetal Risk Report"),
+                 size: 20,
+                 style: :bold,
+                 align: :center
+        pdf.move_down 16
+
+        # ===== PATIENT DETAILS =====
+        pdf.text safe_str("Patient Details"), size: 14, style: :bold
+        pdf.move_down 6
+
+        pdf.text safe_str("Name: #{patient.name.presence || 'N/A'}")
+        age = patient.respond_to?(:age) ? patient.age : nil
+        pdf.text safe_str("Age: #{age || 'N/A'}")
+
+        gest_weeks =
+          if patient.respond_to?(:gestation_weeks)
+            patient.gestation_weeks
+          elsif patient.respond_to?(:gestation)
+            patient.gestation
+          end
+        pdf.text safe_str("Gestation: #{gest_weeks || 'N/A'} weeks")
+        pdf.move_down 14
+
+        # ===== LATEST READING =====
+        pdf.text safe_str("Latest Vital Reading"), size: 14, style: :bold
+        pdf.move_down 6
+
+        if last_reading
+          rec_time = last_reading.recorded_at&.strftime("%d %b %Y, %I:%M %p")
+          pdf.text safe_str("Recorded at: #{rec_time || 'N/A'}")
+          pdf.move_down 4
+
+          pdf.text safe_str("Fetal HR: #{last_reading.fetal_hr || 'N/A'} bpm")
+          pdf.text safe_str("Maternal HR: #{last_reading.maternal_hr || 'N/A'} bpm")
+          pdf.text safe_str(
+            "Blood Pressure: #{last_reading.systolic_bp || 'N/A'}/" \
+            "#{last_reading.diastolic_bp || 'N/A'} mmHg"
+          )
+          pdf.text safe_str("SpO2: #{last_reading.spo2 || 'N/A'}%")
+          pdf.text safe_str("Temperature: #{last_reading.temperature || 'N/A'} °C")
+        else
+          pdf.text safe_str("No readings found for this patient.")
         end
+
+        pdf.move_down 16
+
+        # ===== RISK ASSESSMENT =====
+        pdf.text safe_str("Risk Assessment"), size: 14, style: :bold
+        pdf.move_down 6
+
+        if last_risk
+          pdf.text safe_str("Risk Level: #{last_risk.risk_level || 'N/A'}")
+          pdf.text safe_str("Risk Score: #{last_risk.risk_score || 'N/A'}")
+          pdf.move_down 4
+          pdf.text safe_str("Reason:"), style: :bold
+          pdf.text safe_str(last_risk.reason.presence || "N/A")
+        else
+          pdf.text safe_str("No risk evaluations recorded yet.")
+        end
+
+        pdf.move_down 16
+        pdf.text safe_str(
+          "Note: This report is for screening and monitoring only and " \
+          "does not replace professional medical advice."
+        ), size: 9, style: :italic
+
+        # Send PDF bytes
+        send_data pdf.render,
+                  filename: "risk-report-patient-#{patient.id}.pdf",
+                  type: "application/pdf",
+                  disposition: "attachment"
+      rescue => e
+        Rails.logger.error("[ReportsController] PDF generation failed: #{e.class} - #{e.message}")
+        Rails.logger.error(e.backtrace.first(5).join("\n"))
+
+        error_payload = { error: "Failed to generate report." }
+        error_payload[:debug] = "#{e.class}: #{e.message}" if Rails.env.development?
+
+        render json: error_payload, status: :internal_server_error
       end
-    else
-      pdf.text "Machine Learning Evaluation", style: :bold
-      pdf.text "ML prediction was not available; report shows stored heuristic evaluation only."
-    end
 
-    pdf.move_down 15
-    pdf.text "Generated on: #{Time.zone.now.strftime('%d-%m-%Y %I:%M %p')}", size: 9
+      private
 
-    pdf_data = pdf.render
-
-    send_data pdf_data,
-              filename: "risk-report-patient-#{@patient.id}.pdf",
-              type: "application/pdf",
-              disposition: "attachment"
-  rescue => e
-    Rails.logger.error("ReportsController#show failed: #{e.class} - #{e.message}")
-    Rails.logger.error(e.backtrace.join("\n"))
-    render json: { error: "Failed to generate report." },
-           status: :internal_server_error
-  end
-
-  private
-
-  def set_patient
-    @patient = Patient.find_by(id: params[:patient_id])
-
-    unless @patient
-      render json: { error: "Patient not found" }, status: :not_found
-      return
-    end
-
-    if @patient.user_id != current_user.id
-      render json: { error: "Not authorized for this patient" }, status: :forbidden
-      return
+      # Force all strings into Windows-1252-compatible encoding
+      def safe_str(value)
+        value.to_s.encode("Windows-1252", invalid: :replace, undef: :replace, replace: "?")
+      end
     end
   end
 end

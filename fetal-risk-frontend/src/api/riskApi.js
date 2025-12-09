@@ -17,3 +17,8 @@ export const downloadRiskReport = (patientId) => {
     responseType: "blob",
   });
 };
+
+export const getRiskForecast = (patientId) =>{
+  return api.get(`/patients/${patientId}/risk_forecast`);
+}
+  

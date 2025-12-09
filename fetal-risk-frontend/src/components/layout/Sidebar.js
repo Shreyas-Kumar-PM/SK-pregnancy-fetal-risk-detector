@@ -5,9 +5,19 @@ import { Link, useParams, useLocation } from 'react-router-dom';
 const Sidebar = () => {
   const { patientId } = useParams();
   const location = useLocation();
+
   const pid = patientId || localStorage.getItem("patientId");
 
   const isActive = (path) => location.pathname === path;
+
+  // 🔥 NEW — open AI Care Coach modal
+  const openCareCoach = () => {
+    window.dispatchEvent(
+      new CustomEvent("open-care-coach", {
+        detail: { patientId: pid },
+      })
+    );
+  };
 
   return (
     <div
@@ -15,6 +25,7 @@ const Sidebar = () => {
       style={{ minHeight: '100vh', width: 220 }}
     >
       <Nav className="flex-column gap-2">
+
         <Nav.Item>
           <Nav.Link
             as={Link}
@@ -64,6 +75,18 @@ const Sidebar = () => {
             Settings
           </Nav.Link>
         </Nav.Item>
+
+        {/* 🌸 NEW ITEM: AI Care Coach */}
+        <Nav.Item>
+          <Nav.Link
+            onClick={openCareCoach}
+            style={{ cursor: "pointer" }}
+            className="ai-care-coach-link"
+          >
+            🌸 AI Care Coach
+          </Nav.Link>
+        </Nav.Item>
+
       </Nav>
     </div>
   );
