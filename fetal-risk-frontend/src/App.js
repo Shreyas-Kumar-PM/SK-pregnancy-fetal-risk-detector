@@ -8,7 +8,10 @@ import PatientsListPage from './pages/PatientsListPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import AnalyticsDashboard from './pages/AnalyticsDashboard'; // analytics page
+import AnalyticsDashboard from './pages/AnalyticsDashboard';
+
+// ⭐ NEW — pregnancy articles page
+import ArticlesPage from './pages/ArticlesPage';
 
 const App = () => {
   const [auth, setAuth] = useState(() => ({
@@ -21,6 +24,7 @@ const App = () => {
   return (
     <Router>
       <Routes>
+
         {/* Public Routes */}
         <Route path="/login" element={<LoginPage setAuth={setAuth} />} />
         <Route path="/register" element={<RegisterPage setAuth={setAuth} />} />
@@ -32,7 +36,8 @@ const App = () => {
             isAuthenticated ? (
               <MainLayout auth={auth} setAuth={setAuth}>
                 <Routes>
-                  {/* default -> redirect to current patient's dashboard */}
+
+                  {/* default -> current patient dashboard */}
                   <Route
                     path="/"
                     element={
@@ -53,7 +58,6 @@ const App = () => {
                     element={<PatientHistoryPage />}
                   />
 
-                  {/* ✅ NEW: analytics route with patientId */}
                   <Route
                     path="/patients/:patientId/analytics"
                     element={<AnalyticsDashboard />}
@@ -69,7 +73,13 @@ const App = () => {
                     element={<SettingsPage />}
                   />
 
-                  {/* catch-all inside layout -> go to dashboard */}
+                  {/* ⭐ NEW: Pregnancy Articles Route */}
+                  <Route
+                    path="/articles"
+                    element={<ArticlesPage />}
+                  />
+
+                  {/* catch-all → redirect to dashboard */}
                   <Route
                     path="*"
                     element={
