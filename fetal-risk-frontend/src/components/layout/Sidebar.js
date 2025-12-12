@@ -10,7 +10,7 @@ const Sidebar = () => {
 
   const isActive = (path) => location.pathname === path;
 
-  // 🔥 NEW — open AI Care Coach modal
+  // 🔥 AI Care Coach event dispatcher
   const openCareCoach = () => {
     window.dispatchEvent(
       new CustomEvent("open-care-coach", {
@@ -26,6 +26,7 @@ const Sidebar = () => {
     >
       <Nav className="flex-column gap-2">
 
+        {/* Dashboard */}
         <Nav.Item>
           <Nav.Link
             as={Link}
@@ -36,6 +37,7 @@ const Sidebar = () => {
           </Nav.Link>
         </Nav.Item>
 
+        {/* History */}
         <Nav.Item>
           <Nav.Link
             as={Link}
@@ -46,6 +48,7 @@ const Sidebar = () => {
           </Nav.Link>
         </Nav.Item>
 
+        {/* Analytics */}
         <Nav.Item>
           <Nav.Link
             as={Link}
@@ -56,6 +59,7 @@ const Sidebar = () => {
           </Nav.Link>
         </Nav.Item>
 
+        {/* Patients */}
         <Nav.Item>
           <Nav.Link
             as={Link}
@@ -66,6 +70,7 @@ const Sidebar = () => {
           </Nav.Link>
         </Nav.Item>
 
+        {/* Settings */}
         <Nav.Item>
           <Nav.Link
             as={Link}
@@ -76,7 +81,22 @@ const Sidebar = () => {
           </Nav.Link>
         </Nav.Item>
 
-        {/* 🌸 NEW ITEM: AI Care Coach */}
+        <hr className="my-3" />
+
+        {/* 📰 NEW — Pregnancy Articles */}
+        <Nav.Item>
+          <Nav.Link
+            as={Link}
+            to="/articles"
+            className={isActive('/articles') ? 'active' : ''}
+          >
+            📰 Pregnancy Articles
+          </Nav.Link>
+        </Nav.Item>
+
+        <hr className="my-3" />
+
+        {/* 🌸 AI Care Coach */}
         <Nav.Item>
           <Nav.Link
             onClick={openCareCoach}
