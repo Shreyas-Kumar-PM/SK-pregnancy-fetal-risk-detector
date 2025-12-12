@@ -64,7 +64,7 @@ const Sidebar = () => {
           <Nav.Link
             as={Link}
             to="/patients"
-            className={isActive('/patients') ? 'active' : ''}
+            className={isActive("/patients") ? "active" : ""}
           >
             Patients
           </Nav.Link>
@@ -75,28 +75,61 @@ const Sidebar = () => {
           <Nav.Link
             as={Link}
             to="/settings"
-            className={isActive('/settings') ? 'active' : ''}
+            className={isActive("/settings") ? "active" : ""}
           >
             Settings
           </Nav.Link>
         </Nav.Item>
 
+        {/* Update patient */}
+        <Nav.Item>
+          <Nav.Link
+            as={Link}
+            to={`/patients/${pid}/update`}
+            className={isActive(`/patients/${pid}/update`) ? 'active' : ''}
+          >
+            Update Patient
+          </Nav.Link>
+        </Nav.Item>
+
+        {/* Gamification */}
+        <Nav.Item>
+          <Nav.Link
+            as={Link}
+            to="/gamification"
+            className={isActive('/gamification') ? 'active' : ''}
+          >
+            Rewards & Streaks
+          </Nav.Link>
+        </Nav.Item>
+
         <hr className="my-3" />
 
-        {/* 📰 NEW — Pregnancy Articles */}
+        {/* Pregnancy Articles */}
         <Nav.Item>
           <Nav.Link
             as={Link}
             to="/articles"
             className={isActive('/articles') ? 'active' : ''}
           >
-            📰 Pregnancy Articles
+            Pregnancy Articles
+          </Nav.Link>
+        </Nav.Item>
+
+        {/* 🧘 NEW: Relaxation Module */}
+        <Nav.Item>
+          <Nav.Link
+            as={Link}
+            to="/relaxation"
+            className={isActive('/relaxation') ? 'active' : ''}
+          >
+            Relaxation & Breathing
           </Nav.Link>
         </Nav.Item>
 
         <hr className="my-3" />
 
-        {/* 🌸 AI Care Coach */}
+        {/* AI Care Coach */}
         <Nav.Item>
           <Nav.Link
             onClick={openCareCoach}
