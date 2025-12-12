@@ -611,3 +611,102 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   color: #ddd;
 }
+
+/* Add to your existing CSS file (e.g. src/styles/app.css) */
+
+/* Articles card styling */
+.article-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.08));
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 12px;
+  color: var(--text-primary);
+}
+
+.article-card .card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.article-card .card-text {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.article-card .btn-outline-info {
+  border-color: rgba(150, 200, 255, 0.15);
+  color: #73aef7;
+}
+
+/* Gamification styles */
+.gamification-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.badge-bubble {
+  background: linear-gradient(135deg,#ffd6e8,#c3e8ff);
+  color: #111;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.gamification-large .badge-card {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  padding: 10px;
+  border-radius: 10px;
+  width: 100%;
+}
+
+.gamification-large .badge-icon {
+  font-size: 1.6rem;
+  width: 48px;
+  height: 48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: linear-gradient(135deg,#ffd6e8,#c3e8ff);
+  border-radius: 999px;
+  color: #111;
+}
+
+/* table highlight for catalog */
+.table tbody tr td {
+  vertical-align: middle;
+}
+
+/* responsive tweaks */
+@media (max-width: 768px) {
+  .gamification-large { margin-bottom: 12px; }
+}
+
+/* Add to src/index.css or your global CSS */
+.breath-circle {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  margin: 0 auto;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  box-shadow: inset 0 6px 18px rgba(0,0,0,0.6), 0 6px 30px rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: transform 0.9s cubic-bezier(.22,.9,.2,1), box-shadow 0.9s;
+}
+
+/* Slightly responsive */
+@media (max-width: 768px) {
+  .breath-circle {
+    width: 160px;
+    height: 160px;
+  }
+}
+
