@@ -14,6 +14,20 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_05_091036) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
+  create_table "gamifications", force: :cascade do |t|
+    t.jsonb "badges", default: [], null: false
+    t.datetime "created_at", null: false
+    t.datetime "last_active_at"
+    t.bigint "patient_id"
+    t.integer "points", default: 0, null: false
+    t.integer "streak_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["patient_id"], name: "index_gamifications_on_patient_id"
+    t.index ["user_id", "patient_id"], name: "index_gamifications_on_user_id_and_patient_id", unique: true
+    t.index ["user_id"], name: "index_gamifications_on_user_id"
+  end
+
   create_table "patients", force: :cascade do |t|
     t.integer "age"
     t.string "contact_number"
@@ -66,6 +80,8 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_05_091036) do
     t.datetime "updated_at", null: false
   end
 
+  add_foreign_key "gamifications", "patients"
+  add_foreign_key "gamifications", "users"
   add_foreign_key "patients", "users"
   add_foreign_key "readings", "patients"
   add_foreign_key "risk_evaluations", "patients"
