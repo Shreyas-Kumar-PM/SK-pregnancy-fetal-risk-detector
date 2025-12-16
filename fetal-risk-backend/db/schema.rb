@@ -10,9 +10,22 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_12_05_091036) do
+ActiveRecord::Schema[8.1].define(version: 2025_12_15_091805) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "appointments", force: :cascade do |t|
+    t.datetime "appointment_at", null: false
+    t.datetime "created_at", null: false
+    t.string "doctor_name", null: false
+    t.bigint "patient_id", null: false
+    t.string "reason"
+    t.string "status", default: "scheduled"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["patient_id"], name: "index_appointments_on_patient_id"
+    t.index ["user_id"], name: "index_appointments_on_user_id"
+  end
 
   create_table "gamifications", force: :cascade do |t|
     t.jsonb "badges", default: [], null: false
@@ -80,6 +93,8 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_05_091036) do
     t.datetime "updated_at", null: false
   end
 
+  add_foreign_key "appointments", "patients"
+  add_foreign_key "appointments", "users"
   add_foreign_key "gamifications", "patients"
   add_foreign_key "gamifications", "users"
   add_foreign_key "patients", "users"
