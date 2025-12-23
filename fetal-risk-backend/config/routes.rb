@@ -1,5 +1,9 @@
 # config/routes.rb
 Rails.application.routes.draw do
+  # ---------------- Health Checks (for Render / uptime) ----------------
+  get "/up", to: proc { [200, {}, ["OK"]] }
+  root to: proc { [200, {}, ["Backend running"]] }
+
   namespace :api do
     namespace :v1 do
 
