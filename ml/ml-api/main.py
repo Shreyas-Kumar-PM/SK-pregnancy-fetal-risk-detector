@@ -22,6 +22,8 @@ rf_scaler = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_scaler_multi.job
 logreg_model = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_logreg.joblib"))
 logreg_scaler = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_logreg_scaler.joblib"))
 
+CLASS_SCORE = {0: 0.1, 1: 0.55, 2: 0.9}
+
 # -------------------------------------------------
 # Input schema
 # -------------------------------------------------
@@ -45,33 +47,33 @@ def health():
     return {"status": "ok"}
 
 # -------------------------------------------------
-# Heuristic (controls final label)
+# Heuristic model
 # -------------------------------------------------
 def heuristic(f):
-    score = 0.1
+    score = 0.15
     reasons = []
 
     if f["systolic_bp"] >= 160 or f["diastolic_bp"] >= 110:
-        score += 0.4
+        score += 0.35
         reasons.append("Severe hypertension detected")
 
+    elif f["systolic_bp"] >= 140 or f["diastolic_bp"] >= 90:
+        score += 0.2
+        reasons.append("Elevated blood pressure")
+
     if f["fetal_hr"] < 110 or f["fetal_hr"] > 170:
-        score += 0.3
+        score += 0.25
         reasons.append("Abnormal fetal heart rate")
 
     if f["spo2"] < 94:
         score += 0.2
         reasons.append("Low maternal oxygen saturation")
 
-    score = min(score, 1.0)
+    if f["temperature"] >= 38:
+        score += 0.15
+        reasons.append("Maternal fever detected")
 
-    level = "normal"
-    if score >= 0.7:
-        level = "critical"
-    elif score >= 0.35:
-        level = "warning"
-
-    return level, score, reasons
+    return min(score, 1.0), reasons
 
 # -------------------------------------------------
 @app.post("/predict")
@@ -113,28 +115,45 @@ def predict(data: RiskInput):
     # -------------------------
     # Heuristic
     # -------------------------
-    h_level, h_score, h_reasons = heuristic(f)
+    h_score, h_reasons = heuristic(f)
 
     # -------------------------
     # RF prediction
     # -------------------------
-    x_rf_scaled = rf_scaler.transform(x_rf)
-    rf_probs = rf_model.predict_proba(x_rf_scaled)[0]
-    rf_class = int(rf_model.predict(x_rf_scaled)[0])
+    rf_probs = rf_model.predict_proba(rf_scaler.transform(x_rf))[0]
+    rf_class = int(np.argmax(rf_probs))
+    rf_score = CLASS_SCORE[rf_class]
 
     # -------------------------
     # Logistic Regression prediction
     # -------------------------
-    x_lr_scaled = logreg_scaler.transform(x_lr)
-    lr_probs = logreg_model.predict_proba(x_lr_scaled)[0]
-    lr_class = int(logreg_model.predict(x_lr_scaled)[0])
+    lr_probs = logreg_model.predict_proba(logreg_scaler.transform(x_lr))[0]
+    lr_class = int(np.argmax(lr_probs))
+    lr_score = CLASS_SCORE[lr_class]
+
+    # -------------------------
+    # 🔥 FINAL FUSION
+    # -------------------------
+    final_score = round(
+        (0.4 * h_score) +
+        (0.35 * rf_score) +
+        (0.25 * lr_score),
+        2
+    )
+
+    if final_score >= 0.75:
+        final_level = "critical"
+    elif final_score >= 0.35:
+        final_level = "warning"
+    else:
+        final_level = "normal"
 
     return {
-        "risk_level": h_level,
-        "risk_score": round(h_score, 2),
-        "reason": "; ".join(h_reasons) if h_reasons else "Vitals within normal ranges",
+        "risk_level": final_level,
+        "risk_score": final_score,
+        "reason": "; ".join(h_reasons) if h_reasons else "Vitals within acceptable ranges",
 
-        "model_version": "heuristic + RF + logistic",
+        "model_version": "heuristic + RF + logistic (fused)",
 
         "ml_risk_level": rf_class,
         "ml_class_probabilities": rf_probs.tolist(),
