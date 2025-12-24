@@ -1,46 +1,47 @@
 # app/services/ml/risk_predictor.rb
-require "open3"
+require "net/http"
 require "json"
 
 module Ml
   class RiskPredictor
-    # Path to your predict.py script (from backend folder)
-    PREDICT_SCRIPT = File.expand_path("../../../../ml/predict.py", __dir__)
+    ML_URL = ENV.fetch(
+      "ML_SERVICE_URL",
+      "https://skfetal-risk-ml.onrender.com/predict"
+    )
 
     class PredictionError < StandardError; end
 
-    # vitals_hash is a Ruby hash, e.g.:
-    # {
-    #   maternal_hr: 90,
-    #   systolic_bp: 130,
-    #   diastolic_bp: 85,
-    #   fetal_hr: 145,
-    #   fetal_movement_count: 8,
-    #   spo2: 96,
-    #   temperature: 37.0,
-    #   age: 25,
-    #   bs: 90
-    # }
     def self.call(vitals_hash)
-      raise PredictionError, "predict.py not found" unless File.exist?(PREDICT_SCRIPT)
+      uri = URI(ML_URL)
 
-      json_input = vitals_hash.to_json
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
 
-      # Run: python ml/predict.py '<json>'
-      cmd = ["python", PREDICT_SCRIPT, json_input]
-      stdout, stderr, status = Open3.capture3(*cmd)
+      request = Net::HTTP::Post.new(
+        uri.path,
+        { "Content-Type" => "application/json" }
+      )
 
-      unless status.success?
-        raise PredictionError, "predict.py failed: #{stderr.presence || 'unknown error'}"
+      request.body = vitals_hash.to_json
+      response = http.request(request)
+
+      unless response.code.to_i == 200
+        raise PredictionError, "ML HTTP #{response.code}: #{response.body}"
       end
 
-      begin
-        result = JSON.parse(stdout)
-      rescue JSON::ParserError => e
-        raise PredictionError, "Invalid JSON from predict.py: #{e.message}"
-      end
+      JSON.parse(response.body)
+    rescue => e
+      Rails.logger.error("ML HTTP FAILED: #{e.message}")
+      fallback
+    end
 
-      result
+    def self.fallback
+      {
+        "risk_level" => "normal",
+        "risk_score" => 0.1,
+        "reason"     => "ML service unavailable (fallback)",
+        "model_version" => "fallback"
+      }
     end
   end
 end
