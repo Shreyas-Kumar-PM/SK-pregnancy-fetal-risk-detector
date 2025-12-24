@@ -872,3 +872,39 @@ body {
     transform: translateX(0);
   }
 }
+/* -------------------------------
+   MOBILE SLIDE-IN SIDEBAR
+-------------------------------- */
+
+.sidebar-col {
+  width: 220px;
+}
+
+/* Mobile only */
+@media (max-width: 768px) {
+  .sidebar-col {
+    position: fixed;
+    top: 56px; /* navbar height */
+    left: 0;
+    height: calc(100vh - 56px);
+    background: #05060a;
+    z-index: 1050;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar-col.show {
+    transform: translateX(0);
+  }
+
+  .mobile-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 1040;
+  }
+
+  .main-content-col {
+    padding: 1rem !important;
+  }
+}
