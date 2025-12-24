@@ -14,7 +14,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
 # -------------------------------------------------
-# Load models ONCE (no subprocess, no timeout)
+# Load models
 # -------------------------------------------------
 rf_model = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_rf_pso_multi.joblib"))
 rf_scaler = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_scaler_multi.joblib"))
@@ -23,7 +23,7 @@ logreg_model = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_logreg.joblib
 logreg_scaler = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_logreg_scaler.joblib"))
 
 # -------------------------------------------------
-# Input schema (Rails-safe)
+# Input schema
 # -------------------------------------------------
 class RiskInput(BaseModel):
     maternal_hr: Optional[float] = 90
@@ -40,14 +40,12 @@ class RiskInput(BaseModel):
         extra = "allow"
 
 # -------------------------------------------------
-# Health
-# -------------------------------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 # -------------------------------------------------
-# Heuristic model (controls final label)
+# Heuristic (controls final label)
 # -------------------------------------------------
 def heuristic(f):
     score = 0.1
@@ -76,22 +74,20 @@ def heuristic(f):
     return level, score, reasons
 
 # -------------------------------------------------
-# Predict
-# -------------------------------------------------
 @app.post("/predict")
 def predict(data: RiskInput):
     f = data.dict()
 
     # -------------------------
-    # Derived features (CRITICAL)
+    # Engineered features
     # -------------------------
     map_val = (f["systolic_bp"] + 2 * f["diastolic_bp"]) / 3
     pulse_pressure = f["systolic_bp"] - f["diastolic_bp"]
 
     # -------------------------
-    # EXACT feature order used in training (8)
+    # RF VECTOR (8 features)
     # -------------------------
-    x = np.array([[
+    x_rf = np.array([[
         f["age"],
         f["systolic_bp"],
         f["diastolic_bp"],
@@ -103,23 +99,35 @@ def predict(data: RiskInput):
     ]])
 
     # -------------------------
+    # LOGREG VECTOR (6 features)
+    # -------------------------
+    x_lr = np.array([[
+        f["age"],
+        f["systolic_bp"],
+        f["diastolic_bp"],
+        f["bs"],
+        f["temperature"],
+        f["maternal_hr"]
+    ]])
+
+    # -------------------------
     # Heuristic
     # -------------------------
     h_level, h_score, h_reasons = heuristic(f)
 
     # -------------------------
-    # RF
+    # RF prediction
     # -------------------------
-    x_rf = rf_scaler.transform(x)
-    rf_probs = rf_model.predict_proba(x_rf)[0]
-    rf_class = int(rf_model.predict(x_rf)[0])
+    x_rf_scaled = rf_scaler.transform(x_rf)
+    rf_probs = rf_model.predict_proba(x_rf_scaled)[0]
+    rf_class = int(rf_model.predict(x_rf_scaled)[0])
 
     # -------------------------
-    # Logistic Regression
+    # Logistic Regression prediction
     # -------------------------
-    x_lr = logreg_scaler.transform(x)
-    lr_probs = logreg_model.predict_proba(x_lr)[0]
-    lr_class = int(logreg_model.predict(x_lr)[0])
+    x_lr_scaled = logreg_scaler.transform(x_lr)
+    lr_probs = logreg_model.predict_proba(x_lr_scaled)[0]
+    lr_class = int(logreg_model.predict(x_lr_scaled)[0])
 
     return {
         "risk_level": h_level,
