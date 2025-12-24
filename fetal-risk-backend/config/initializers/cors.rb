@@ -1,9 +1,16 @@
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
-    origins 'http://localhost:3001', 'https://*.netlify.app'
-    resource '*',
+    origins(
+      "http://localhost:3000",
+      "http://localhost:3001",
+      /https:\/\/.*\.netlify\.app/,
+      /https:\/\/.*\.onrender\.com/
+    )
+
+    resource "*",
              headers: :any,
              methods: %i[get post put patch delete options head],
-             expose: %w[Authorization]
+             expose: ["Authorization"],
+             credentials: true
   end
 end

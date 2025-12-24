@@ -1,51 +1,53 @@
-require "open3"
+require "net/http"
 require "json"
+require "uri"
 
 class MlRiskEvaluator
+  ML_URL = ENV.fetch(
+    "ML_SERVICE_URL",
+    "https://skfetal-risk-ml.onrender.com/predict"
+  )
+
   def initialize(patient, reading)
     @patient = patient
     @reading = reading
   end
 
   def call
-    # Build JSON input for Python model
-    input = {
-      maternal_hr:          @reading.maternal_hr,
-      systolic_bp:          @reading.systolic_bp,
-      diastolic_bp:         @reading.diastolic_bp,
-      fetal_hr:             @reading.fetal_hr,
-      fetal_movement_count: @reading.fetal_movement_count,
-      spo2:                 @reading.spo2,
-      temperature:          @reading.temperature
-    }.to_json
+    uri = URI(ML_URL)
 
-    # predict.py is in ../ml relative to Rails root
-    # Rails.root -> fetal-risk-backend
-    python_path = Rails.root.join("..", "ml", "predict.py").to_s
+    payload = {
+      age: @patient.age,
+      systolic_bp: @reading.systolic_bp,
+      diastolic_bp: @reading.diastolic_bp,
+      glucose: @reading.glucose,
+      heart_rate: @reading.maternal_hr
+    }
 
-    # IMPORTANT: pass arguments as an array, NOT a single string.
-    # This avoids all issues with spaces in paths.
-    stdout, stderr, status = Open3.capture3("python3", python_path, input)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
 
-    unless status.success?
-      Rails.logger.error("ML ERROR: #{stderr}")
+    request = Net::HTTP::Post.new(uri.path, {
+      "Content-Type" => "application/json"
+    })
+    request.body = payload.to_json
+
+    response = http.request(request)
+
+    unless response.is_a?(Net::HTTPSuccess)
+      Rails.logger.error("ML HTTP ERROR: #{response.code} #{response.body}")
       return fallback
     end
 
-    begin
-      result = JSON.parse(stdout)
-    rescue JSON::ParserError => e
-      Rails.logger.error("ML JSON PARSE ERROR: #{e.message} — output was: #{stdout.inspect}")
-      return fallback
-    end
+    result = JSON.parse(response.body)
 
     {
       "risk_level" => result["risk_level"],
       "risk_score" => result["risk_score"],
-      "reason"     => result["reason"]
+      "reason"     => "Predicted by ML service"
     }
   rescue => e
-    Rails.logger.error("ML FAILED: #{e.class}: #{e.message}")
+    Rails.logger.error("ML CALL FAILED: #{e.message}")
     fallback
   end
 
@@ -55,7 +57,7 @@ class MlRiskEvaluator
     {
       "risk_level" => "normal",
       "risk_score" => 0.1,
-      "reason"     => "Fallback ML model (normal)"
+      "reason"     => "Fallback (ML unavailable)"
     }
   end
 end
