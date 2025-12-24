@@ -4,13 +4,14 @@ Rails.application.config.middleware.insert_before 0, Rack::Cors do
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:3002',
-      'https://skfetal-risk-frontend.onrender.com'
+      'https://skfetal-risk-frontend.onrender.com',
+      /https:\/\/.*\.vercel\.app/
     )
 
     resource '*',
              headers: :any,
              methods: %i[get post put patch delete options head],
-             expose: ['Authorization'],
+             expose: %w[Authorization],
              credentials: false
   end
 end
