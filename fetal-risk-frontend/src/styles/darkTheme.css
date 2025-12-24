@@ -852,3 +852,23 @@ body {
     font-size: 0.85rem;
   }
 }
+/* =========================
+   MOBILE SLIDE-IN SIDEBAR
+========================= */
+
+@media (max-width: 768px) {
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(.22,.9,.2,1);
+    z-index: 1202;
+  }
+
+  .app-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+}
