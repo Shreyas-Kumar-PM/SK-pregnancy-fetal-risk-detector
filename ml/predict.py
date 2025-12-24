@@ -2,84 +2,82 @@ import sys
 import json
 import os
 import traceback
-
 import numpy as np
 import joblib
 
 # ------------------------------
-# Path-safe base directory
+# Paths (ROOT-based)
 # ------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 
 # ------------------------------
-# Load models safely
+# Safe model loading
 # ------------------------------
-def safe_load(path):
+def load(path):
     return joblib.load(path) if os.path.exists(path) else None
 
-rf_model = safe_load(os.path.join(MODELS_DIR, "maternal_risk_rf_pso_multi.joblib"))
-rf_scaler = safe_load(os.path.join(MODELS_DIR, "maternal_risk_scaler_multi.joblib"))
 
-logreg_model = safe_load(os.path.join(MODELS_DIR, "maternal_risk_logreg.joblib"))
-logreg_scaler = safe_load(os.path.join(MODELS_DIR, "maternal_risk_logreg_scaler.joblib"))
+rf_model = load(os.path.join(MODELS_DIR, "maternal_risk_rf_pso_multi.joblib"))
+rf_scaler = load(os.path.join(MODELS_DIR, "maternal_risk_scaler_multi.joblib"))
+
+logreg_model = load(os.path.join(MODELS_DIR, "maternal_risk_logreg.joblib"))
+logreg_scaler = load(os.path.join(MODELS_DIR, "maternal_risk_logreg_scaler.joblib"))
+
+LABELS = ["low", "medium", "high"]
 
 # ------------------------------
-# Heuristic model
+# Heuristic model (authoritative)
 # ------------------------------
-def heuristic(features):
+def heuristic(f):
     score = 0.1
     reasons = []
 
-    if features["systolic_bp"] >= 160 or features["diastolic_bp"] >= 110:
-        score += 0.4
-        reasons.append("Severe hypertension detected")
+    if f["systolic_bp"] >= 170 or f["diastolic_bp"] >= 110:
+        score += 0.45
+        reasons.append("Severe hypertension")
 
-    if features["fetal_hr"] < 110 or features["fetal_hr"] > 170:
-        score += 0.3
+    if f["fetal_hr"] < 110 or f["fetal_hr"] > 170:
+        score += 0.35
         reasons.append("Abnormal fetal heart rate")
 
-    if features["spo2"] < 94:
-        score += 0.2
-        reasons.append("Low maternal oxygen saturation")
+    if f["spo2"] < 92:
+        score += 0.30
+        reasons.append("Maternal hypoxia")
+
+    if f["temperature"] >= 39:
+        score += 0.25
+        reasons.append("High maternal fever")
 
     score = min(score, 1.0)
 
-    level = "normal"
     if score >= 0.7:
         level = "critical"
     elif score >= 0.35:
         level = "warning"
+    else:
+        level = "normal"
 
-    return level, score, reasons
+    return level, round(score, 2), reasons
 
-# ------------------------------
-# ML prediction helpers
-# ------------------------------
-def rf_predict(x):
-    if not rf_model:
+
+def ml_predict(model, scaler, x):
+    if not model or not scaler:
         return None, None
-    x = rf_scaler.transform([x])
-    probs = rf_model.predict_proba(x)[0]
-    cls = rf_model.predict(x)[0]
-    return cls, probs.tolist()
+    x = scaler.transform([x])
+    probs = model.predict_proba(x)[0]
+    idx = int(np.argmax(probs))
+    return LABELS[idx], probs.tolist()
 
-def logreg_predict(x):
-    if not logreg_model:
-        return None, None
-    x = logreg_scaler.transform([x])
-    probs = logreg_model.predict_proba(x)[0]
-    cls = logreg_model.predict(x)[0]
-    return cls, probs.tolist()
 
 # ------------------------------
-# MAIN
+# MAIN ENTRY
 # ------------------------------
 try:
     data = json.loads(sys.argv[1])
 
-    # Defaults (ABSOLUTELY CRITICAL)
-    features = {
+    # 🔒 Defaults are CRITICAL
+    f = {
         "maternal_hr": float(data.get("maternal_hr", 90)),
         "systolic_bp": float(data.get("systolic_bp", 120)),
         "diastolic_bp": float(data.get("diastolic_bp", 80)),
@@ -91,43 +89,40 @@ try:
         "bs": float(data.get("bs", 90)),
     }
 
-    # Heuristic
-    h_level, h_score, h_reasons = heuristic(features)
+    # 1️⃣ Heuristic
+    h_level, h_score, h_reasons = heuristic(f)
 
-    # ML feature vector (trained order)
-    ml_x = [
-        features["age"],
-        features["systolic_bp"],
-        features["diastolic_bp"],
-        features["bs"],
-        features["temperature"],
-        features["maternal_hr"],
+    # 2️⃣ ML feature vector (training order)
+    x = [
+        f["age"],
+        f["systolic_bp"],
+        f["diastolic_bp"],
+        f["bs"],
+        f["temperature"],
+        f["maternal_hr"],
     ]
 
-    rf_cls, rf_probs = rf_predict(ml_x)
-    lg_cls, lg_probs = logreg_predict(ml_x)
+    rf_level, rf_probs = ml_predict(rf_model, rf_scaler, x)
+    lg_level, lg_probs = ml_predict(logreg_model, logreg_scaler, x)
 
-    output = {
+    print(json.dumps({
         "risk_level": h_level,
-        "risk_score": round(h_score, 2),
-        "reason": "; ".join(h_reasons) if h_reasons else "Vitals within normal ranges",
-
+        "risk_score": h_score,
+        "reason": "; ".join(h_reasons) if h_reasons else "Vitals within safe limits",
         "model_version": "heuristic + RF + logistic",
 
-        "ml_risk_level": str(rf_cls),
+        "ml_risk_level": rf_level,
         "ml_class_probabilities": rf_probs,
 
-        "ml_logreg_risk_level": str(lg_cls),
-        "ml_logreg_class_probabilities": lg_probs,
-    }
-
-    print(json.dumps(output))
+        "ml_logreg_risk_level": lg_level,
+        "ml_logreg_class_probabilities": lg_probs
+    }))
 
 except Exception as e:
     print(json.dumps({
         "risk_level": "critical",
         "risk_score": 1.0,
-        "reason": "ML failure: " + str(e),
+        "reason": f"ML fatal error: {str(e)}",
         "model_version": "error",
         "trace": traceback.format_exc()
     }))
