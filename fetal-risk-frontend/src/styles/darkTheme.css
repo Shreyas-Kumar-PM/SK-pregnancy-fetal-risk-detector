@@ -957,3 +957,42 @@ body {
     }
   }
   
+  /* ============================= */
+/* MOBILE SLIDE-IN SIDEBAR FIX */
+/* ============================= */
+
+.sidebar-col {
+  position: relative;
+  z-index: 1;
+}
+
+/* MOBILE ONLY */
+@media (max-width: 768px) {
+  .sidebar-col {
+    position: fixed;
+    top: 56px; /* navbar height */
+    left: 0;
+    height: calc(100vh - 56px);
+    width: 240px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1050;
+    background: transparent;
+  }
+
+  .sidebar-col.show {
+    transform: translateX(0);
+  }
+
+  .main-content-col {
+    width: 100%;
+  }
+
+  .mobile-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 1040;
+    backdrop-filter: blur(2px);
+  }
+}
