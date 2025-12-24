@@ -908,3 +908,52 @@ body {
     padding: 1rem !important;
   }
 }
+
+/* ===============================
+   MOBILE SLIDING SIDEBAR FIX
+   =============================== */
+
+   @media (max-width: 768px) {
+    .sidebar-col {
+      position: fixed;
+      top: 56px; /* navbar height */
+      left: 0;
+      height: calc(100vh - 56px);
+      width: 260px;
+      background: transparent;
+      z-index: 1050;
+  
+      transform: translateX(-100%);
+      transition: transform 0.3s ease-in-out;
+    }
+  
+    .sidebar-col.show {
+      transform: translateX(0);
+    }
+  
+    .app-sidebar {
+      width: 260px !important;
+      height: 100%;
+      background: radial-gradient(
+          circle at top,
+          rgba(21, 24, 40, 0.96),
+          #05060a
+        );
+      border-right: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 12px 0 40px rgba(0, 0, 0, 0.8);
+    }
+  
+    .mobile-sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1040;
+      backdrop-filter: blur(2px);
+    }
+  
+    /* Prevent main content scroll when sidebar open */
+    body.sidebar-open {
+      overflow: hidden;
+    }
+  }
+  
