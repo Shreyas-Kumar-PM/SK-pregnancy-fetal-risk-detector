@@ -4,10 +4,10 @@ from typing import Optional
 import subprocess
 import json
 import os
+import sys
 
 app = FastAPI(title="Fetal Risk ML API")
 
-# 👇 predict.py is ONE LEVEL ABOVE ml-api/
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PREDICT_SCRIPT = os.path.abspath(os.path.join(BASE_DIR, "..", "predict.py"))
 
@@ -24,7 +24,7 @@ class RiskInput(BaseModel):
     bs: Optional[float] = 90
 
     class Config:
-        extra = "allow"   # Rails may send extra keys
+        extra = "allow"
 
 
 @app.get("/health")
@@ -38,21 +38,29 @@ def predict(data: RiskInput):
 
     try:
         proc = subprocess.run(
-            ["python3", PREDICT_SCRIPT, payload],
+            [sys.executable, PREDICT_SCRIPT, payload],  # 🔥 FIX
             capture_output=True,
             text=True,
-            timeout=8
+            timeout=15
         )
 
-        if proc.returncode != 0 or not proc.stdout:
-            raise RuntimeError(proc.stderr)
+        if proc.returncode != 0:
+            return {
+                "risk_level": "critical",
+                "risk_score": 1.0,
+                "reason": f"predict.py error: {proc.stderr}",
+                "model_version": "execution_error"
+            }
+
+        if not proc.stdout:
+            raise RuntimeError("Empty output from predict.py")
 
         return json.loads(proc.stdout)
 
     except Exception as e:
         return {
-            "risk_level": "normal",
-            "risk_score": 0.1,
-            "reason": f"ML fallback: {str(e)}",
-            "model_version": "fallback"
+            "risk_level": "critical",
+            "risk_score": 1.0,
+            "reason": f"ML execution failure: {str(e)}",
+            "model_version": "fatal_fallback"
         }
