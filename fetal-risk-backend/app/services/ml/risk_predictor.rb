@@ -1,7 +1,6 @@
 # app/services/ml/risk_predictor.rb
 require "net/http"
 require "json"
-require "uri"
 
 module Ml
   class RiskPredictor
@@ -13,40 +12,38 @@ module Ml
     class PredictionError < StandardError; end
 
     def self.call(vitals_hash)
-      uri = URI.parse(ML_URL)
+      uri = URI(ML_URL)
 
       http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = (uri.scheme == "https")
+      http.use_ssl = uri.scheme == "https"
 
-      # ⏱️ Important: prevent hanging requests
-      http.open_timeout = 5
-      http.read_timeout = 8
+      # ⏱ prevent UI freezes
+      http.open_timeout = 3
+      http.read_timeout = 6
 
-      request = Net::HTTP::Post.new(uri.request_uri)
-      request["Content-Type"] = "application/json"
-      request["Accept"] = "application/json"
+      request = Net::HTTP::Post.new(
+        uri.path,
+        { "Content-Type" => "application/json" }
+      )
+
       request.body = vitals_hash.to_json
-
       response = http.request(request)
 
-      unless response.is_a?(Net::HTTPSuccess)
-        raise PredictionError,
-              "ML HTTP #{response.code}: #{response.body}"
+      unless response.code.to_i == 200
+        raise PredictionError, "ML HTTP #{response.code}: #{response.body}"
       end
 
       JSON.parse(response.body)
     rescue => e
       Rails.logger.error("[ML] HTTP FAILED → #{e.class}: #{e.message}")
-      fallback(e.message)
+      fallback
     end
 
-    def self.fallback(error_message = nil)
+    def self.fallback
       {
-        "risk_level"     => "normal",
-        "risk_score"     => 0.10,
-        "reason"         => error_message ?
-                              "ML service error (fallback): #{error_message}" :
-                              "ML service unavailable (fallback)",
+        "risk_level" => "normal",
+        "risk_score" => 0.10,
+        "reason" => "ML service unavailable – fallback used",
         "model_version" => "fallback",
         "ml_risk_level" => nil,
         "ml_class_probabilities" => nil,
