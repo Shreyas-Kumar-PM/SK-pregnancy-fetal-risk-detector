@@ -4,26 +4,33 @@ import subprocess
 import json
 import os
 
-app = FastAPI(title="Fetal Risk ML API (Hybrid)")
+app = FastAPI(title="Fetal Risk ML API")
 
 BASE_DIR = os.path.dirname(__file__)
-PREDICT_SCRIPT = os.path.join(BASE_DIR, "predict.py")
+
+# IMPORTANT FIX
+PREDICT_SCRIPT = os.path.abspath(
+    os.path.join(BASE_DIR, "..", "predict.py")
+)
 
 class RiskInput(BaseModel):
     maternal_hr: float | None = None
     systolic_bp: float | None = None
     diastolic_bp: float | None = None
     fetal_hr: float | None = None
-    fetal_movement_count: float | None = None
+    fetal_movement_count: int | None = None
     spo2: float | None = None
     temperature: float | None = None
-    age: float | None = None
+    age: int | None = None
     bs: float | None = None
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": "hybrid-heuristic-rf-logreg"}
+    return {
+        "status": "ok",
+        "predict_script_exists": os.path.exists(PREDICT_SCRIPT)
+    }
 
 
 @app.post("/predict")
@@ -31,28 +38,19 @@ def predict(data: RiskInput):
     if not os.path.exists(PREDICT_SCRIPT):
         raise HTTPException(status_code=500, detail="predict.py not found")
 
+    payload = data.dict(exclude_none=True)
+
     try:
-        payload = json.dumps(data.dict())
         result = subprocess.run(
-            ["python", PREDICT_SCRIPT],
-            input=payload,
-            text=True,
+            ["python3", PREDICT_SCRIPT, json.dumps(payload)],
             capture_output=True,
+            text=True,
             timeout=10
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     if result.returncode != 0:
-        raise HTTPException(
-            status_code=500,
-            detail=f"ML error: {result.stderr}"
-        )
+        raise HTTPException(status_code=500, detail=result.stderr)
 
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Invalid ML output: {result.stdout}"
-        )
+    return json.loads(result.stdout)

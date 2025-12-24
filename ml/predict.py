@@ -2,133 +2,106 @@ import sys
 import json
 import os
 
-"""
-Hybrid risk model: heuristic + RF (PSO-tuned) + optional Logistic Regression.
-
-Input:
-- JSON via argv[1] (CLI mode) OR
-- JSON via stdin (FastAPI mode)
-
-Output: JSON to stdout
-"""
-
-# ==========================================================
-# 🔥 INPUT HANDLING (CLI + FastAPI compatible)
-# ==========================================================
-def read_input():
-    if len(sys.argv) > 1:
-        return sys.argv[1]
-    return sys.stdin.read()
-
-
-# ==========================================================
-# OPTIONAL MODEL LOADING
-# ==========================================================
-RF_AVAILABLE = False
-LOGREG_AVAILABLE = False
-
-rf_model = None
-rf_scaler = None
-rf_features = None
-rf_label_mapping = None
-
-logreg_model = None
-logreg_scaler = None
-logreg_features = None
-logreg_label_mapping = None
-
+# ------------------------------
+# Safe imports (ML optional)
+# ------------------------------
 try:
     import joblib
     import numpy as np
-
-    BASE_DIR = os.path.dirname(__file__)
-    MODELS_DIR = os.path.join(BASE_DIR, "models")
-
-    # RF + PSO
-    RF_MODEL_PATH = os.path.join(MODELS_DIR, "maternal_risk_rf_pso_multi.joblib")
-    RF_SCALER_PATH = os.path.join(MODELS_DIR, "maternal_risk_scaler_multi.joblib")
-    RF_META_PATH = os.path.join(MODELS_DIR, "maternal_risk_meta_multi.json")
-
-    # Logistic Regression
-    LOGREG_MODEL_PATH = os.path.join(MODELS_DIR, "maternal_risk_logreg.joblib")
-    LOGREG_SCALER_PATH = os.path.join(MODELS_DIR, "maternal_risk_logreg_scaler.joblib")
-    LOGREG_META_PATH = os.path.join(MODELS_DIR, "maternal_risk_logreg_meta.json")
-
-    # Load RF + PSO
-    if os.path.exists(RF_MODEL_PATH) and os.path.exists(RF_SCALER_PATH) and os.path.exists(RF_META_PATH):
-        rf_model = joblib.load(RF_MODEL_PATH)
-        rf_scaler = joblib.load(RF_SCALER_PATH)
-        with open(RF_META_PATH) as f:
-            meta = json.load(f)
-        rf_features = meta.get("features", [])
-        rf_label_mapping = {int(v): k for k, v in meta.get("label_mapping", {}).items()}
-        RF_AVAILABLE = True
-
-    # Load Logistic Regression
-    if os.path.exists(LOGREG_MODEL_PATH) and os.path.exists(LOGREG_SCALER_PATH) and os.path.exists(LOGREG_META_PATH):
-        logreg_model = joblib.load(LOGREG_MODEL_PATH)
-        logreg_scaler = joblib.load(LOGREG_SCALER_PATH)
-        with open(LOGREG_META_PATH) as f:
-            meta = json.load(f)
-        logreg_features = meta.get("features", [])
-        logreg_label_mapping = {int(v): k for k, v in meta.get("label_mapping", {}).items()}
-        LOGREG_AVAILABLE = True
-
+    SKLEARN_AVAILABLE = True
 except Exception:
-    RF_AVAILABLE = False
-    LOGREG_AVAILABLE = False
+    SKLEARN_AVAILABLE = False
 
 
-# ==========================================================
-# HEURISTIC MODEL (PRIMARY DECISION MAKER)
-# ==========================================================
-def compute_risk_heuristic(f):
+# ------------------------------
+# Paths
+# ------------------------------
+BASE_DIR = os.path.dirname(__file__)
+
+# IMPORTANT:
+# Models are inside ml/ml-api/models
+MODELS_DIR = os.path.abspath(
+    os.path.join(BASE_DIR, "ml-api", "models")
+)
+
+# ------------------------------
+# Load models (optional)
+# ------------------------------
+RF_AVAILABLE = False
+LOGREG_AVAILABLE = False
+
+rf_model = rf_scaler = rf_features = rf_label_mapping = None
+logreg_model = logreg_scaler = logreg_features = logreg_label_mapping = None
+
+if SKLEARN_AVAILABLE and os.path.isdir(MODELS_DIR):
+    try:
+        # RF + PSO
+        rf_model_path = os.path.join(MODELS_DIR, "maternal_risk_rf_pso_multi.joblib")
+        rf_scaler_path = os.path.join(MODELS_DIR, "maternal_risk_scaler_multi.joblib")
+        rf_meta_path = os.path.join(MODELS_DIR, "maternal_risk_meta_multi.json")
+
+        if os.path.exists(rf_model_path):
+            rf_model = joblib.load(rf_model_path)
+            rf_scaler = joblib.load(rf_scaler_path)
+            with open(rf_meta_path) as f:
+                meta = json.load(f)
+
+            rf_features = meta["features"]
+            rf_label_mapping = {int(v): k for k, v in meta["label_mapping"].items()}
+            RF_AVAILABLE = True
+    except Exception:
+        RF_AVAILABLE = False
+
+    try:
+        # Logistic Regression
+        logreg_model_path = os.path.join(MODELS_DIR, "maternal_risk_logreg.joblib")
+        logreg_scaler_path = os.path.join(MODELS_DIR, "maternal_risk_logreg_scaler.joblib")
+        logreg_meta_path = os.path.join(MODELS_DIR, "maternal_risk_logreg_meta.json")
+
+        if os.path.exists(logreg_model_path):
+            logreg_model = joblib.load(logreg_model_path)
+            logreg_scaler = joblib.load(logreg_scaler_path)
+            with open(logreg_meta_path) as f:
+                meta = json.load(f)
+
+            logreg_features = meta["features"]
+            logreg_label_mapping = {int(v): k for k, v in meta["label_mapping"].items()}
+            LOGREG_AVAILABLE = True
+    except Exception:
+        LOGREG_AVAILABLE = False
+
+
+# ------------------------------
+# Heuristic model (CORE)
+# ------------------------------
+def compute_heuristic(data):
     score = 0.1
     reasons = []
 
-    def add(points, msg):
+    def bump(val, reason):
         nonlocal score
-        score += points
-        reasons.append(msg)
+        score += val
+        reasons.append(reason)
 
-    if f.get("maternal_hr") is not None:
-        if f["maternal_hr"] < 60 or f["maternal_hr"] > 120:
-            add(0.20, f"Abnormal maternal HR ({f['maternal_hr']} bpm)")
-        elif f["maternal_hr"] < 70 or f["maternal_hr"] > 110:
-            add(0.10, f"Borderline maternal HR ({f['maternal_hr']} bpm)")
+    if data.get("maternal_hr", 0) > 120:
+        bump(0.2, "High maternal heart rate")
 
-    if f.get("systolic_bp") and f.get("diastolic_bp"):
-        sbp, dbp = f["systolic_bp"], f["diastolic_bp"]
-        if sbp >= 160 or dbp >= 110:
-            add(0.30, f"Severe hypertension ({sbp}/{dbp} mmHg)")
-        elif sbp >= 140 or dbp >= 90:
-            add(0.15, f"Elevated blood pressure ({sbp}/{dbp} mmHg)")
+    if data.get("systolic_bp", 0) >= 140 or data.get("diastolic_bp", 0) >= 90:
+        bump(0.2, "Elevated blood pressure")
 
-    if f.get("fetal_hr") is not None:
-        if f["fetal_hr"] < 110 or f["fetal_hr"] > 170:
-            add(0.30, f"Abnormal fetal HR ({f['fetal_hr']} bpm)")
-        elif f["fetal_hr"] < 120 or f["fetal_hr"] > 160:
-            add(0.15, f"Borderline fetal HR ({f['fetal_hr']} bpm)")
+    if data.get("fetal_hr", 0) < 110 or data.get("fetal_hr", 0) > 170:
+        bump(0.3, "Abnormal fetal heart rate")
 
-    if f.get("fetal_movement_count") is not None:
-        if f["fetal_movement_count"] <= 2:
-            add(0.25, f"Very low fetal movement count ({f['fetal_movement_count']})")
-        elif f["fetal_movement_count"] <= 5:
-            add(0.10, f"Reduced fetal movement count ({f['fetal_movement_count']})")
+    if data.get("fetal_movement_count", 10) <= 3:
+        bump(0.25, "Low fetal movement")
 
-    if f.get("spo2") is not None:
-        if f["spo2"] < 90:
-            add(0.30, f"Maternal hypoxia (SpO₂ {f['spo2']}%)")
-        elif f["spo2"] < 94:
-            add(0.15, f"Borderline SpO₂ ({f['spo2']}%)")
+    if data.get("spo2", 100) < 94:
+        bump(0.2, "Low SpO2")
 
-    if f.get("temperature") is not None:
-        if f["temperature"] >= 38.5:
-            add(0.20, f"High maternal temperature ({f['temperature']}°C)")
-        elif f["temperature"] >= 37.8:
-            add(0.10, f"Borderline maternal temperature ({f['temperature']}°C)")
+    if data.get("temperature", 36.8) >= 38:
+        bump(0.2, "High temperature")
 
-    score = max(0.0, min(1.0, score))
+    score = max(0.0, min(score, 1.0))
 
     if score < 0.35:
         level = "normal"
@@ -138,82 +111,84 @@ def compute_risk_heuristic(f):
         level = "critical"
 
     if not reasons:
-        reasons.append("All vital signs within acceptable ranges.")
+        reasons.append("Vitals within normal range")
 
     return level, round(score, 3), "; ".join(reasons)
 
 
-# ==========================================================
-# FEATURE MAP FOR ML MODELS
-# ==========================================================
-FEATURE_MAP = {
-    "Age": "age",
-    "SystolicBP": "systolic_bp",
-    "DiastolicBP": "diastolic_bp",
-    "BS": "bs",
-    "BodyTemp": "temperature",
-    "HeartRate": "maternal_hr",
-}
+# ------------------------------
+# Main
+# ------------------------------
+def main():
+    if len(sys.argv) < 2:
+        print(json.dumps({
+            "risk_level": "normal",
+            "risk_score": 0.1,
+            "reason": "No input provided",
+            "model_version": "heuristic_only",
+            "ml_risk_level": None,
+            "ml_class_probabilities": None,
+            "ml_logreg_risk_level": None,
+            "ml_logreg_class_probabilities": None
+        }))
+        return
 
+    data = json.loads(sys.argv[1])
 
-# ==========================================================
-# ML HELPERS
-# ==========================================================
-def run_logreg(f):
-    if not LOGREG_AVAILABLE:
-        return None
+    # Heuristic first
+    risk_level, risk_score, reason = compute_heuristic(data)
 
-    row = []
-    for feat in logreg_features:
-        key = FEATURE_MAP.get(feat)
-        if key is None or f.get(key) is None:
-            return None
-        row.append(float(f[key]))
-
-    x = logreg_scaler.transform([row])
-    probs = logreg_model.predict_proba(x)[0]
-
-    return {
-        "risk_level": logreg_label_mapping[int(probs.argmax())],
-        "class_probabilities": {
-            logreg_label_mapping[i]: float(p) for i, p in enumerate(probs)
-        }
+    output = {
+        "risk_level": risk_level,
+        "risk_score": risk_score,
+        "reason": reason,
+        "model_version": "heuristic_only",
+        "ml_risk_level": None,
+        "ml_class_probabilities": None,
+        "ml_logreg_risk_level": None,
+        "ml_logreg_class_probabilities": None
     }
 
-
-# ==========================================================
-# MAIN
-# ==========================================================
-def main():
-    raw = read_input()
-    if not raw:
-        print(json.dumps({"risk_level": "normal", "risk_score": 0.1}))
-        return
-
-    try:
-        data = json.loads(raw)
-    except Exception as e:
-        print(json.dumps({"risk_level": "normal", "risk_score": 0.1, "reason": str(e)}))
-        return
-
-    for k in data:
+    # RF model
+    if RF_AVAILABLE:
         try:
-            data[k] = float(data[k])
+            row = []
+            for f in rf_features:
+                if f == "MAP":
+                    row.append((data["systolic_bp"] + 2 * data["diastolic_bp"]) / 3)
+                elif f == "PulsePressure":
+                    row.append(data["systolic_bp"] - data["diastolic_bp"])
+                else:
+                    row.append(float(data.get(f.lower(), 0)))
+
+            X = rf_scaler.transform([row])
+            proba = rf_model.predict_proba(X)[0]
+            pred = int(rf_model.predict(X)[0])
+
+            output["ml_risk_level"] = rf_label_mapping.get(pred)
+            output["ml_class_probabilities"] = {
+                rf_label_mapping.get(i): float(p)
+                for i, p in enumerate(proba)
+            }
+            output["model_version"] = "heuristic+rf"
         except Exception:
             pass
 
-    level, score, reason = compute_risk_heuristic(data)
+    # Logistic Regression
+    if LOGREG_AVAILABLE:
+        try:
+            row = [float(data.get(f.lower(), 0)) for f in logreg_features]
+            X = logreg_scaler.transform([row])
+            proba = logreg_model.predict_proba(X)[0]
+            pred = int(logreg_model.predict(X)[0])
 
-    logreg = run_logreg(data)
-
-    output = {
-        "risk_level": level,
-        "risk_score": score,
-        "reason": reason,
-        "model_version": "heuristic+logreg",
-        "ml_logreg_risk_level": logreg["risk_level"] if logreg else None,
-        "ml_logreg_class_probabilities": logreg["class_probabilities"] if logreg else None
-    }
+            output["ml_logreg_risk_level"] = logreg_label_mapping.get(pred)
+            output["ml_logreg_class_probabilities"] = {
+                logreg_label_mapping.get(i): float(p)
+                for i, p in enumerate(proba)
+            }
+        except Exception:
+            pass
 
     print(json.dumps(output))
 
