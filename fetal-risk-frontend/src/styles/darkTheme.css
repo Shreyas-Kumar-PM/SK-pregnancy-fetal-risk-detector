@@ -710,3 +710,145 @@ body {
   }
 }
 
+/* =========================
+   MOBILE RESPONSIVE FIXES
+========================= */
+
+@media (max-width: 768px) {
+
+  /* Sidebar off-canvas */
+  .sidebar-col {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1050;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    background: transparent;
+  }
+
+  .sidebar-col.show {
+    transform: translateX(0);
+  }
+
+  /* Overlay behind sidebar */
+  .mobile-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1040;
+    backdrop-filter: blur(2px);
+  }
+
+  /* Main content full width */
+  .main-content-col {
+    padding: 1rem !important;
+  }
+
+  /* Dashboard spacing fix */
+  .dashboard-bg-inner {
+    padding: 1rem;
+  }
+
+  /* Welcome banner mobile */
+  .welcome-banner {
+    padding: 16px 18px;
+  }
+
+  .welcome-title {
+    font-size: 1.1rem;
+  }
+
+  .welcome-text {
+    font-size: 0.9rem;
+    line-height: 1.45rem;
+  }
+
+  /* Cards spacing */
+  .card {
+    border-radius: 16px;
+  }
+
+  /* Buttons stack better */
+  .btn {
+    font-size: 0.85rem;
+  }
+
+  /* AI Search button smaller */
+  .ai-search-btn {
+    padding: 7px 14px;
+    font-size: 0.85rem;
+  }
+}
+/* =========================
+   MOBILE RESPONSIVE FIXES
+========================= */
+
+@media (max-width: 768px) {
+
+  /* Sidebar off-canvas */
+  .sidebar-col {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1050;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    background: transparent;
+  }
+
+  .sidebar-col.show {
+    transform: translateX(0);
+  }
+
+  /* Overlay behind sidebar */
+  .mobile-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1040;
+    backdrop-filter: blur(2px);
+  }
+
+  /* Main content full width */
+  .main-content-col {
+    padding: 1rem !important;
+  }
+
+  /* Dashboard spacing fix */
+  .dashboard-bg-inner {
+    padding: 1rem;
+  }
+
+  /* Welcome banner mobile */
+  .welcome-banner {
+    padding: 16px 18px;
+  }
+
+  .welcome-title {
+    font-size: 1.1rem;
+  }
+
+  .welcome-text {
+    font-size: 0.9rem;
+    line-height: 1.45rem;
+  }
+
+  /* Cards spacing */
+  .card {
+    border-radius: 16px;
+  }
+
+  /* Buttons stack better */
+  .btn {
+    font-size: 0.85rem;
+  }
+
+  /* AI Search button smaller */
+  .ai-search-btn {
+    padding: 7px 14px;
+    font-size: 0.85rem;
+  }
+}
