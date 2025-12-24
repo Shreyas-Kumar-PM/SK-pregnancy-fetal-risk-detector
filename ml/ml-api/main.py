@@ -8,24 +8,15 @@ import os
 app = FastAPI(title="Fetal Risk ML API")
 
 # -------------------------------------------------
-# Paths
-# -------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
-# -------------------------------------------------
-# Load models
-# -------------------------------------------------
 rf_model = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_rf_pso_multi.joblib"))
 rf_scaler = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_scaler_multi.joblib"))
 
 logreg_model = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_logreg.joblib"))
 logreg_scaler = joblib.load(os.path.join(MODELS_DIR, "maternal_risk_logreg_scaler.joblib"))
 
-CLASS_SCORE = {0: 0.1, 1: 0.55, 2: 0.9}
-
-# -------------------------------------------------
-# Input schema
 # -------------------------------------------------
 class RiskInput(BaseModel):
     maternal_hr: Optional[float] = 90
@@ -41,119 +32,90 @@ class RiskInput(BaseModel):
     class Config:
         extra = "allow"
 
-# -------------------------------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 # -------------------------------------------------
-# Heuristic model
+# Conservative heuristic (GATING MODEL)
 # -------------------------------------------------
 def heuristic(f):
-    score = 0.15
+    score = 0.12
     reasons = []
 
-    if f["systolic_bp"] >= 160 or f["diastolic_bp"] >= 110:
-        score += 0.35
-        reasons.append("Severe hypertension detected")
+    severe_flags = 0
 
-    elif f["systolic_bp"] >= 140 or f["diastolic_bp"] >= 90:
-        score += 0.2
-        reasons.append("Elevated blood pressure")
+    if f["systolic_bp"] >= 160 or f["diastolic_bp"] >= 110:
+        score += 0.25
+        severe_flags += 1
+        reasons.append("Severe hypertension")
 
     if f["fetal_hr"] < 110 or f["fetal_hr"] > 170:
         score += 0.25
+        severe_flags += 1
         reasons.append("Abnormal fetal heart rate")
 
-    if f["spo2"] < 94:
+    if f["spo2"] < 92:
         score += 0.2
-        reasons.append("Low maternal oxygen saturation")
+        severe_flags += 1
+        reasons.append("Maternal hypoxia")
 
-    if f["temperature"] >= 38:
+    if f["temperature"] >= 38.5:
         score += 0.15
-        reasons.append("Maternal fever detected")
+        reasons.append("High maternal fever")
 
-    return min(score, 1.0), reasons
+    return min(score, 1.0), reasons, severe_flags
 
 # -------------------------------------------------
 @app.post("/predict")
 def predict(data: RiskInput):
     f = data.dict()
 
-    # -------------------------
-    # Engineered features
-    # -------------------------
+    # Feature engineering
     map_val = (f["systolic_bp"] + 2 * f["diastolic_bp"]) / 3
     pulse_pressure = f["systolic_bp"] - f["diastolic_bp"]
 
-    # -------------------------
-    # RF VECTOR (8 features)
-    # -------------------------
-    x_rf = np.array([[
-        f["age"],
-        f["systolic_bp"],
-        f["diastolic_bp"],
-        f["bs"],
-        f["temperature"],
-        f["maternal_hr"],
-        map_val,
-        pulse_pressure
-    ]])
+    x_rf = np.array([[f["age"], f["systolic_bp"], f["diastolic_bp"],
+                      f["bs"], f["temperature"], f["maternal_hr"],
+                      map_val, pulse_pressure]])
 
-    # -------------------------
-    # LOGREG VECTOR (6 features)
-    # -------------------------
-    x_lr = np.array([[
-        f["age"],
-        f["systolic_bp"],
-        f["diastolic_bp"],
-        f["bs"],
-        f["temperature"],
-        f["maternal_hr"]
-    ]])
+    x_lr = np.array([[f["age"], f["systolic_bp"], f["diastolic_bp"],
+                      f["bs"], f["temperature"], f["maternal_hr"]]])
 
-    # -------------------------
     # Heuristic
-    # -------------------------
-    h_score, h_reasons = heuristic(f)
+    h_score, h_reasons, severe_flags = heuristic(f)
 
-    # -------------------------
-    # RF prediction
-    # -------------------------
+    # RF
     rf_probs = rf_model.predict_proba(rf_scaler.transform(x_rf))[0]
     rf_class = int(np.argmax(rf_probs))
-    rf_score = CLASS_SCORE[rf_class]
 
-    # -------------------------
-    # Logistic Regression prediction
-    # -------------------------
+    # Logistic
     lr_probs = logreg_model.predict_proba(logreg_scaler.transform(x_lr))[0]
     lr_class = int(np.argmax(lr_probs))
-    lr_score = CLASS_SCORE[lr_class]
 
     # -------------------------
-    # 🔥 FINAL FUSION
+    # FINAL DECISION LOGIC
     # -------------------------
-    final_score = round(
-        (0.4 * h_score) +
-        (0.35 * rf_score) +
-        (0.25 * lr_score),
-        2
-    )
+    ml_agrees = (rf_class >= 1) + (lr_class >= 1)
 
-    if final_score >= 0.75:
+    if severe_flags >= 2 and ml_agrees >= 1:
         final_level = "critical"
-    elif final_score >= 0.35:
+        final_score = 0.85
+
+    elif h_score >= 0.3 or ml_agrees >= 2:
         final_level = "warning"
+        final_score = 0.45 + 0.1 * ml_agrees
+
     else:
         final_level = "normal"
+        final_score = round(0.15 + 0.1 * ml_agrees, 2)
 
     return {
         "risk_level": final_level,
-        "risk_score": final_score,
-        "reason": "; ".join(h_reasons) if h_reasons else "Vitals within acceptable ranges",
+        "risk_score": round(final_score, 2),
+        "reason": "; ".join(h_reasons) if h_reasons else "Vitals within normal limits",
 
-        "model_version": "heuristic + RF + logistic (fused)",
+        "model_version": "heuristic-gated RF + logistic",
 
         "ml_risk_level": rf_class,
         "ml_class_probabilities": rf_probs.tolist(),
