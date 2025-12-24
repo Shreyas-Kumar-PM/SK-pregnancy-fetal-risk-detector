@@ -32,14 +32,16 @@ const RiskStatusCard = ({ risk }) => {
   } = risk;
 
   const scoreText =
-    typeof risk_score === 'number' ? risk_score.toFixed(2) : 'N/A';
+    risk_score !== null && risk_score !== undefined
+      ? Number(risk_score).toFixed(2)
+      : 'N/A';
 
   return (
     <Card className="shadow-sm mb-3">
       <Card.Body>
         <Card.Title>Current Risk</Card.Title>
 
-        {risk_level ? (
+        {risk_level !== null && risk_level !== undefined ? (
           <h3 className="mt-2">
             <Badge bg={getVariant(risk_level)} className="px-3 py-2">
               {risk_level.toUpperCase()}
@@ -56,27 +58,26 @@ const RiskStatusCard = ({ risk }) => {
 
           {reason && (
             <div className="mt-1">
-              <strong>Reason:</strong> {reason}
+              <strong>Overall Reason:</strong> {reason}
             </div>
           )}
 
-          {/* Model type (Heuristic-only or Heuristic + RF) */}
           {model_version && (
             <div className="mt-2">
               <strong>Model:</strong> {model_version}
             </div>
           )}
 
-          {/* RF/PSO ML Model Output */}
+          {/* RF Model */}
           {ml_risk_level && (
             <div className="mt-2">
-              <strong>RF (PSO) ML Risk Level:</strong> {ml_risk_level}
+              <strong>RF (PSO) Risk:</strong> {ml_risk_level}
             </div>
           )}
 
           {ml_class_probabilities && (
             <div className="mt-2">
-              <strong>RF ML Probabilities:</strong>
+              <strong>RF Probabilities:</strong>
               <ul className="mb-0">
                 {Object.entries(ml_class_probabilities).map(([label, p]) => (
                   <li key={label}>
@@ -87,7 +88,7 @@ const RiskStatusCard = ({ risk }) => {
             </div>
           )}
 
-          {/* 🔵 Logistic Regression Model Output */}
+          {/* Logistic Regression */}
           {ml_logreg_risk_level && (
             <div className="mt-3">
               <strong>Logistic Regression Risk:</strong> {ml_logreg_risk_level}
@@ -110,7 +111,6 @@ const RiskStatusCard = ({ risk }) => {
           )}
         </div>
 
-        {/* ⭐ NEW – "Explain My Risk" Button */}
         <Button
           variant="outline-light"
           size="sm"
