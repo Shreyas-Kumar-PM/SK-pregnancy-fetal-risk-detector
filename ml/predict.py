@@ -2,12 +2,59 @@ import sys
 import json
 import os
 
-sys.stdout.reconfigure(line_buffering=True)
+# ==============================
+# Optional ML imports
+# ==============================
+RF_AVAILABLE = False
+LOGREG_AVAILABLE = False
 
-# ------------------------------
-# Heuristic Risk Model (PRIMARY)
-# ------------------------------
-def compute_risk_heuristic(features):
+rf_model = rf_scaler = rf_features = rf_label_mapping = None
+logreg_model = logreg_scaler = logreg_features = logreg_label_mapping = None
+
+try:
+    import joblib
+    import numpy as np
+
+    BASE_DIR = os.path.dirname(__file__)
+    MODELS_DIR = os.path.join(BASE_DIR, "ml-api", "models")
+
+    # ---- RF (PSO tuned) ----
+    RF_MODEL = os.path.join(MODELS_DIR, "maternal_risk_rf_pso_multi.joblib")
+    RF_SCALER = os.path.join(MODELS_DIR, "maternal_risk_scaler_multi.joblib")
+    RF_META = os.path.join(MODELS_DIR, "maternal_risk_meta_multi.json")
+
+    if os.path.exists(RF_MODEL) and os.path.exists(RF_SCALER) and os.path.exists(RF_META):
+        rf_model = joblib.load(RF_MODEL)
+        rf_scaler = joblib.load(RF_SCALER)
+        with open(RF_META) as f:
+            meta = json.load(f)
+        rf_features = meta["features"]
+        rf_label_mapping = {int(v): k for k, v in meta["label_mapping"].items()}
+        RF_AVAILABLE = True
+
+    # ---- Logistic Regression ----
+    LOGREG_MODEL = os.path.join(MODELS_DIR, "maternal_risk_logreg.joblib")
+    LOGREG_SCALER = os.path.join(MODELS_DIR, "maternal_risk_logreg_scaler.joblib")
+    LOGREG_META = os.path.join(MODELS_DIR, "maternal_risk_logreg_meta.json")
+
+    if os.path.exists(LOGREG_MODEL) and os.path.exists(LOGREG_SCALER) and os.path.exists(LOGREG_META):
+        logreg_model = joblib.load(LOGREG_MODEL)
+        logreg_scaler = joblib.load(LOGREG_SCALER)
+        with open(LOGREG_META) as f:
+            meta = json.load(f)
+        logreg_features = meta["features"]
+        logreg_label_mapping = {int(v): k for k, v in meta["label_mapping"].items()}
+        LOGREG_AVAILABLE = True
+
+except Exception:
+    RF_AVAILABLE = False
+    LOGREG_AVAILABLE = False
+
+
+# ==============================
+# Heuristic model (safety gate)
+# ==============================
+def heuristic(features):
     score = 0.1
     reasons = []
 
@@ -19,96 +66,123 @@ def compute_risk_heuristic(features):
     spo2 = features.get("spo2")
     temp = features.get("temperature")
 
-    if mhr is not None:
-        if mhr < 60 or mhr > 120:
-            score += 0.2
-            reasons.append(f"Abnormal maternal HR ({mhr})")
-        elif mhr < 70 or mhr > 110:
-            score += 0.1
+    severe = False
 
-    if sbp is not None and dbp is not None:
-        if sbp >= 160 or dbp >= 110:
-            score += 0.3
-            reasons.append(f"Severe hypertension ({sbp}/{dbp})")
-        elif sbp >= 140 or dbp >= 90:
-            score += 0.15
+    if mhr and (mhr < 60 or mhr > 120):
+        score += 0.3; reasons.append(f"Severe maternal HR ({mhr})"); severe = True
+    if sbp and sbp >= 160 or dbp and dbp >= 110:
+        score += 0.3; reasons.append(f"Severe hypertension ({sbp}/{dbp})"); severe = True
+    if fhr and (fhr < 110 or fhr > 170):
+        score += 0.3; reasons.append(f"Severe fetal HR ({fhr})"); severe = True
+    if fm is not None and fm <= 2:
+        score += 0.25; reasons.append(f"Very low fetal movement ({fm})"); severe = True
+    if spo2 and spo2 < 90:
+        score += 0.3; reasons.append(f"Hypoxia (SpO₂ {spo2})"); severe = True
+    if temp and temp >= 38.5:
+        score += 0.2; reasons.append(f"High fever ({temp})"); severe = True
 
-    if fhr is not None:
-        if fhr < 110 or fhr > 170:
-            score += 0.3
-            reasons.append(f"Abnormal fetal HR ({fhr})")
-        elif fhr < 120 or fhr > 160:
-            score += 0.15
+    score = min(1.0, score)
 
-    if fm is not None:
-        if fm <= 2:
-            score += 0.25
-            reasons.append("Very low fetal movement")
-        elif fm <= 5:
-            score += 0.1
-
-    if spo2 is not None:
-        if spo2 < 90:
-            score += 0.3
-            reasons.append("Maternal hypoxia")
-        elif spo2 < 94:
-            score += 0.15
-
-    if temp is not None:
-        if temp >= 38.5:
-            score += 0.2
-            reasons.append("High maternal temperature")
-        elif temp >= 37.8:
-            score += 0.1
-
-    score = min(1.0, max(0.0, score))
-
-    if score < 0.35:
-        level = "normal"
-    elif score < 0.7:
+    if severe:
+        level = "critical"
+    elif score >= 0.35:
         level = "warning"
     else:
-        level = "critical"
+        level = "normal"
 
-    if not reasons:
-        reasons.append("Vitals within acceptable ranges.")
-
-    return {
-        "risk_level": level,
-        "risk_score": round(score, 3),
-        "reason": "; ".join(reasons),
-    }
+    return level, score, reasons
 
 
-# ------------------------------
-# Main Entrypoint
-# ------------------------------
+# ==============================
+# ML helpers
+# ==============================
+FEATURE_MAP = {
+    "Age": "age",
+    "SystolicBP": "systolic_bp",
+    "DiastolicBP": "diastolic_bp",
+    "BS": "bs",
+    "BodyTemp": "temperature",
+    "HeartRate": "maternal_hr",
+}
+
+
+def run_rf(features):
+    if not RF_AVAILABLE:
+        return None, None
+
+    row = []
+    sbp, dbp = features.get("systolic_bp"), features.get("diastolic_bp")
+
+    for f in rf_features:
+        if f == "MAP":
+            row.append((sbp + 2 * dbp) / 3)
+        elif f == "PulsePressure":
+            row.append(sbp - dbp)
+        else:
+            row.append(float(features.get(FEATURE_MAP[f])))
+
+    x = rf_scaler.transform([row])
+    proba = rf_model.predict_proba(x)[0]
+    pred = int(rf_model.predict(x)[0])
+
+    return rf_label_mapping[pred], dict(zip(rf_label_mapping.values(), proba))
+
+
+def run_logreg(features):
+    if not LOGREG_AVAILABLE:
+        return None, None
+
+    row = [float(features.get(FEATURE_MAP[f])) for f in logreg_features]
+    x = logreg_scaler.transform([row])
+    proba = logreg_model.predict_proba(x)[0]
+    pred = int(logreg_model.predict(x)[0])
+
+    return logreg_label_mapping[pred], dict(zip(logreg_label_mapping.values(), proba))
+
+
+# ==============================
+# FINAL COMBINED DECISION
+# ==============================
+def decide_final(h_level, rf_level, lr_level):
+    if h_level == "critical":
+        return "critical"
+    if rf_level == "high risk" or lr_level == "high risk":
+        return "critical"
+    if h_level == "warning" or rf_level == "mid risk" or lr_level == "mid risk":
+        return "warning"
+    return "normal"
+
+
+# ==============================
+# ENTRYPOINT
+# ==============================
 def main():
-    try:
-        payload = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
-    except Exception:
-        payload = {}
+    data = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
 
-    for k, v in payload.items():
+    # numeric coercion
+    for k, v in data.items():
         try:
-            payload[k] = float(v)
+            data[k] = float(v)
         except Exception:
             pass
 
-    heuristic = compute_risk_heuristic(payload)
+    h_level, h_score, h_reasons = heuristic(data)
+    rf_level, rf_probs = run_rf(data)
+    lr_level, lr_probs = run_logreg(data)
 
-    output = {
-        "risk_level": heuristic["risk_level"],
-        "risk_score": heuristic["risk_score"],
-        "reason": heuristic["reason"],
-        "model_version": "heuristic_stable_v1",
-        "ml_risk_level": None,
-        "ml_class_probabilities": None,
-        "ml_logreg_risk_level": None,
-        "ml_logreg_class_probabilities": None,
-    }
+    final = decide_final(h_level, rf_level, lr_level)
 
-    print(json.dumps(output), flush=True)
+    print(json.dumps({
+        "risk_level": final,
+        "risk_score": round(h_score, 3),
+        "reason": "; ".join(h_reasons) or "Vitals within safe ranges",
+        "model_version": "heuristic+rf+logreg",
+        "heuristic_level": h_level,
+        "ml_risk_level": rf_level,
+        "ml_class_probabilities": rf_probs,
+        "ml_logreg_risk_level": lr_level,
+        "ml_logreg_class_probabilities": lr_probs
+    }))
 
 
 if __name__ == "__main__":
