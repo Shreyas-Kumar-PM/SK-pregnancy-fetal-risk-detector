@@ -13,18 +13,16 @@ const MainLayout = ({ children, auth, setAuth }) => {
       <AppNavbar
         auth={auth}
         setAuth={setAuth}
-        onMenuClick={() => setShowSidebar(true)} // ✅ OPEN SIDEBAR
+        onMenuClick={() => setShowSidebar(true)}
       />
 
       <Container fluid className="flex-grow-1 app-main">
-        <Row className="h-100">
-          {/* SIDEBAR */}
-          <Col
-            xs="auto"
-            className={`p-0 sidebar-col ${showSidebar ? "show" : ""}`}
-          >
+        <Row className="h-100 position-relative">
+
+          {/* ✅ SIDEBAR (NOT Bootstrap Col) */}
+          <div className={`sidebar-col ${showSidebar ? "show" : ""}`}>
             <Sidebar onClose={() => setShowSidebar(false)} />
-          </Col>
+          </div>
 
           {/* MAIN CONTENT */}
           <Col className="p-4 main-content-col">{children}</Col>
