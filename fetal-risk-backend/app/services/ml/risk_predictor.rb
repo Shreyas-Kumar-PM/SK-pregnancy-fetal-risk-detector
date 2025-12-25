@@ -12,25 +12,32 @@ module Ml
     class PredictionError < StandardError; end
 
     def self.call(vitals_hash)
-      uri = URI(ML_URL)
+      uri = URI.parse(ML_URL)
 
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = uri.scheme == "https"
 
-      # ⏱ prevent UI freezes
+      # ⏱ Prevent UI freezes / hanging requests
       http.open_timeout = 3
       http.read_timeout = 6
 
       request = Net::HTTP::Post.new(
-        uri.path,
-        { "Content-Type" => "application/json" }
+        uri.request_uri,
+        {
+          "Content-Type" => "application/json",
+          "Accept" => "application/json"
+        }
       )
 
       request.body = vitals_hash.to_json
+
       response = http.request(request)
 
       unless response.code.to_i == 200
-        raise PredictionError, "ML HTTP #{response.code}: #{response.body}"
+        Rails.logger.error(
+          "[ML] Non-200 response (#{response.code}) → #{response.body}"
+        )
+        raise PredictionError, "ML HTTP #{response.code}"
       end
 
       JSON.parse(response.body)
