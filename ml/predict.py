@@ -70,6 +70,9 @@ try:
 
     heuristic_score, heuristic_reasons = heuristic(features)
 
+    map_val = (features["systolic_bp"] + 2 * features["diastolic_bp"]) / 3
+    pulse_pressure = features["systolic_bp"] - features["diastolic_bp"]
+
     ml_x = [
         features["age"],
         features["systolic_bp"],
@@ -77,8 +80,9 @@ try:
         features["bs"],
         features["temperature"],
         features["maternal_hr"],
+        map_val,
+        pulse_pressure,
     ]
-
     rf_cls, rf_probs = model_predict(rf_model, rf_scaler, ml_x)
     lr_cls, lr_probs = model_predict(logreg_model, logreg_scaler, ml_x)
 
