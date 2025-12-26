@@ -6,7 +6,7 @@ import { getReadings } from "../api/readingsApi";
 import {
   getCurrentRisk,
   downloadRiskReport,
-  getRiskForecast,
+  getRiskForecast,        // ⬅ NEW
 } from "../api/riskApi";
 import { simulateReading } from "../api/simulationApi";
 import AlertsPanel from "../components/dashboard/AlertsPanel";
@@ -17,13 +17,15 @@ import VitalsChart from "../components/dashboard/VitalsChart";
 import RiskAlertBanner from "../components/RiskAlertBanner";
 import ExplainRiskModal from "../components/ExplainRiskModal";
 import AiHealthSearchModal from "../components/AiHealthSearchModal";
-import RiskForecastCard from "../components/dashboard/RiskForecastCard";
-import CareCoachModal from "../components/CareCoachModal";
+import RiskForecastCard from "../components/dashboard/RiskForecastCard"; // ⬅ NEW
+import CareCoachModal from "../components/CareCoachModal"; // ⬅ NEW
+
 
 const DashboardPage = () => {
   const { patientId } = useParams();
   const navigate = useNavigate();
 
+  // Resolve patientId
   const resolvedPatientId =
     patientId && patientId !== "undefined"
       ? patientId
@@ -31,31 +33,40 @@ const DashboardPage = () => {
 
   const [readings, setReadings] = useState([]);
   const [risk, setRisk] = useState(null);
-  const [riskForecast, setRiskForecast] = useState(null);
+  const [riskForecast, setRiskForecast] = useState(null); // ⬅ NEW
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState(null);
   const [loadingRisk, setLoadingRisk] = useState(true);
 
+  // -------------------------------------------------------
+  // fetchData wrapped in useCallback
+  // -------------------------------------------------------
   const fetchData = useCallback(
     async (id) => {
       try {
+        setError(null);
         setLoadingRisk(true);
+
         const [readingsRes, riskRes, forecastRes] = await Promise.all([
           getReadings(id),
           getCurrentRisk(id),
-          getRiskForecast(id),
+          getRiskForecast(id), // ⬅ NEW
         ]);
 
         setReadings(readingsRes.data);
         setRisk(riskRes.data);
-        setRiskForecast(forecastRes.data);
+        setRiskForecast(forecastRes.data); // ⬅ NEW
       } catch (err) {
+        console.error("Error fetching dashboard data:", err);
         const status = err.response?.status;
         if (status === 401) {
-          localStorage.clear();
+          localStorage.removeItem("token");
+          localStorage.removeItem("patientId");
           navigate("/login", { replace: true });
+        } else if (status === 404) {
+          setError("No patient data found for this account.");
         } else {
-          setError("Failed to load dashboard data.");
+          setError("Failed to load data from server.");
         }
       } finally {
         setLoadingRisk(false);
@@ -64,6 +75,9 @@ const DashboardPage = () => {
     [navigate]
   );
 
+  // -------------------------------------------------------
+  // triggerSimulation wrapped in useCallback
+  // -------------------------------------------------------
   const triggerSimulation = useCallback(
     async (id, mode) => {
       try {
@@ -73,33 +87,50 @@ const DashboardPage = () => {
 
         const { reading } = simRes.data;
 
+        // Update readings list (for chart + live vitals)
         setReadings((prev) => [reading, ...prev].slice(0, 100));
 
+        // Refresh risk + forecast together
         const [riskRes, forecastRes] = await Promise.all([
           getCurrentRisk(id),
-          getRiskForecast(id),
+          getRiskForecast(id), // ⬅ NEW
         ]);
+        const latestRisk = riskRes.data;
+        setRisk(latestRisk);
+        setRiskForecast(forecastRes.data); // ⬅ NEW
 
-        setRisk(riskRes.data);
-        setRiskForecast(forecastRes.data);
-
-        if (["warning", "critical"].includes(riskRes.data?.risk_level)) {
+        // Push alert if needed
+        if (
+          latestRisk &&
+          ["warning", "critical"].includes(latestRisk.risk_level)
+        ) {
           setAlerts((prev) => [
             {
               timestamp: reading.recorded_at,
-              level: riskRes.data.risk_level,
-              message: riskRes.data.reason,
+              level: latestRisk.risk_level,
+              message: latestRisk.reason,
             },
             ...prev,
           ]);
         }
-      } catch {
-        setError("Failed to generate sample reading.");
+      } catch (err) {
+        console.error("Error simulating reading:", err);
+        const status = err.response?.status;
+        if (status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("patientId");
+          navigate("/login", { replace: true });
+        } else {
+          setError("Failed to generate sample reading.");
+        }
       }
     },
     [navigate]
   );
 
+  // -------------------------------------------------------
+  // useEffect with correct deps
+  // -------------------------------------------------------
   useEffect(() => {
     if (!resolvedPatientId) {
       navigate("/login", { replace: true });
@@ -108,40 +139,52 @@ const DashboardPage = () => {
 
     fetchData(resolvedPatientId);
 
-    const interval = setInterval(
-      () => triggerSimulation(resolvedPatientId),
-      15000
-    );
+    const interval = setInterval(() => {
+      // normal mode auto-simulation every 15s
+      triggerSimulation(resolvedPatientId);
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [resolvedPatientId, fetchData, triggerSimulation, navigate]);
+  }, [resolvedPatientId, navigate, fetchData, triggerSimulation]);
 
-  // 🔥 MOBILE SIDEBAR OPEN
-  const openSidebar = () => {
-    window.dispatchEvent(new CustomEvent("open-sidebar"));
+  const handleNormalSimulation = () => {
+    if (resolvedPatientId) triggerSimulation(resolvedPatientId);
   };
 
+  const handleCriticalSimulation = () => {
+    if (resolvedPatientId) triggerSimulation(resolvedPatientId, "critical");
+  };
+
+  const handleDownloadReport = async () => {
+    if (!resolvedPatientId) return;
+    try {
+      const res = await downloadRiskReport(resolvedPatientId);
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `risk-report-patient-${resolvedPatientId}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download report:", err);
+      alert("Failed to download report. Please try again.");
+    }
+  };
+
+  // -------------------------------------------------------
+  // RENDER
+  // -------------------------------------------------------
   return (
     <div className="dashboard-bg">
       <div className="dashboard-bg-inner">
-        {error && <div className="alert alert-danger">{error}</div>}
+        {error && <div className="alert alert-danger py-2 mb-3">{error}</div>}
 
-        {/* 🔥 MOBILE TOP BAR */}
+        {/* Top bar: title + AI health search icon button */}
         <div className="d-flex justify-content-between align-items-center mb-3">
-          <div className="d-flex align-items-center gap-2">
-            {/* ☰ MOBILE MENU BUTTON */}
-            <button
-              className="btn btn-outline-light d-md-none"
-              onClick={openSidebar}
-              aria-label="Open sidebar"
-            >
-              ☰
-            </button>
-
-            <h3 className="text-white fw-bold mb-0">
-              Maternal–Fetal Health Dashboard
-            </h3>
-          </div>
+          <h3 className="text-white fw-bold mb-0">
+            Maternal–Fetal Health Dashboard
+          </h3>
 
           <button
             className="ai-search-btn"
@@ -157,15 +200,21 @@ const DashboardPage = () => {
           </button>
         </div>
 
+        {/* Friendly banner */}
         <div className="welcome-banner mb-4">
           <h4 className="welcome-title">👶 Maternal–Fetal Health Monitoring</h4>
           <p className="welcome-text">
-            Continuous monitoring with ML-powered early risk detection.
+            This dashboard continuously monitors maternal and fetal vitals,
+            combining medical heuristics with advanced machine-learning models
+            to provide early detection of potential risks and support a safe,
+            healthy pregnancy journey.
           </p>
         </div>
 
+        {/* Real-time banner using current risk */}
         <RiskAlertBanner risk={risk} loading={loadingRisk} />
 
+        {/* ROW 1: Wide vitals + profile on right */}
         <Row className="mb-4">
           <Col md={8}>
             <LiveVitalsCard readings={readings} />
@@ -175,25 +224,55 @@ const DashboardPage = () => {
           </Col>
         </Row>
 
+        {/* ROW 2: Current risk as a horizontal bar */}
         <Row className="mb-4">
-          <Col>
-            <RiskStatusCard risk={risk} loading={loadingRisk} />
+          <Col md={12}>
+            <div className="risk-horizontal-wrapper">
+              <RiskStatusCard risk={risk} loading={loadingRisk} />
+            </div>
           </Col>
         </Row>
 
+        {/* ROW 3: Actions */}
+        <Row className="mb-4">
+          <Col className="d-flex justify-content-between align-items-center gap-2">
+            <Button
+              variant="outline-info"
+              size="sm"
+              onClick={handleDownloadReport}
+            >
+              ⬇ Download Risk Report (PDF)
+            </Button>
+
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="outline-light" onClick={handleNormalSimulation}>
+                Generate Normal Sample Reading
+              </Button>
+              <Button variant="danger" onClick={handleCriticalSimulation}>
+                Generate Critical Demo Alert
+              </Button>
+            </div>
+          </Col>
+        </Row>
+
+        {/* ROW 4: Trend chart + AI forecast + Alerts */}
         <Row>
           <Col md={8}>
             <VitalsChart readings={readings} />
-            <RiskForecastCard forecast={riskForecast} />
+            {/* NEW: AI risk timeline forecast below chart */}
+            <div className="mt-3">
+              <RiskForecastCard forecast={riskForecast} />
+            </div>
           </Col>
           <Col md={4}>
             <AlertsPanel alerts={alerts} />
           </Col>
         </Row>
 
+        {/* Modals */}
         <ExplainRiskModal />
         <AiHealthSearchModal />
-        <CareCoachModal />
+        <CareCoachModal /> 
       </div>
     </div>
   );
